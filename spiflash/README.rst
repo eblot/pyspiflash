@@ -1,15 +1,17 @@
-SPI flash device driver
-~~~~~~~~~~~~~~~~~~~~~~~
+pyspiflash
+==========
+
+SPI data flash device drivers (pure Python)
 
 SPI flash devices, also known as *DataFlash* are commonly found in embedded
 products, to store firmware, microcode or configuration parameters.
 
-PyFtdi comes with several pure Python drivers for those flash devices, that
-demonstrate use of SPI devices with PyFtdi. It could also be useful to dump
+PySpiFlash_ comes with several pure Python drivers for those flash devices, that
+demonstrate use of SPI devices with PyFtdi_. It could also be useful to dump
 flash contents or recover from a bricked devices.
 
-FTDI_ and other vendors have made simple adapters available, with SPI wires
-that enable trivial connections to an SPI flash device.
+.. _PySpiFlash : https://github.com/eblot/pyspiflash
+.. _PyFtdi : https://github.com/eblot/pyftdi
 
 Supported SPI flash devices
 ---------------------------
