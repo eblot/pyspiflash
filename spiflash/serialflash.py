@@ -1,4 +1,4 @@
-# Copyright (c) 2010-2014, Emmanuel Blot <emmanuel.blot@free.fr>
+# Copyright (c) 2010-2015, Emmanuel Blot <emmanuel.blot@free.fr>
 # All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -21,9 +21,9 @@
 
 import sys
 import time
-from pyftdi.pyftdi.ftdi import Ftdi
-from pyftdi.pyftdi.spi import SpiController
-from pyftdi.pyftdi.misc import hexdump, pretty_size
+from pyftdi.ftdi import Ftdi
+from pyftdi.spi import SpiController
+from pyftdi.misc import hexdump, pretty_size
 from array import array as Array
 
 

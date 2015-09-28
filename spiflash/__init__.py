@@ -1,4 +1,4 @@
-# Copyright (c) 2010-2014, Emmanuel Blot <emmanuel.blot@free.fr>
+# Copyright (c) 2010-2015, Emmanuel Blot <emmanuel.blot@free.fr>
 # All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,5 +19,5 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-version_info = (0, 2, 0)
+version_info = (0, 3, 0)
 __version__ = '.'.join(['%d' % v for v in version_info])

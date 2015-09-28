@@ -86,3 +86,16 @@ Erase
 
 Unlock
   Unlock any protected flash device sectors
+
+Dependencies
+------------
+
+PySpiFlash_ relies on PyFtdi_ module to access the SPI flash device. The
+internal API of PyFtdi_ has been changed with version 0.11.0.
+
+==================== ===============
+PySpiFlash_ version  PyFtdi_ version
+-------------------- ---------------
+0.2.*                0.9 .. 0.10
+0.3.*                0.11+
+==================== ===============

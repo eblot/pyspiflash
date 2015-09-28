@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2011, Emmanuel Blot <emmanuel.blot@free.fr>
+# Copyright (c) 2011-2015, Emmanuel Blot <emmanuel.blot@free.fr>
 # All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 from array import array as Array
-from pyftdi.pyftdi.misc import hexdump, pretty_size
+from pyftdi.misc import hexdump, pretty_size
 from spiflash.serialflash import SerialFlashManager
 from random import randint
 import sys
