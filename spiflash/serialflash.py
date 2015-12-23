@@ -768,9 +768,9 @@ class W25xFlashDevice(_Gen25FlashDevice):
     """Winbond W25Q/W25X flash device implementation"""
 
     JEDEC_ID = 0xEF
-    DEVICES = { 0x30 : 'W25X', 0x40 : 'W25Q' }
+    DEVICES = {0x30 : 'W25X', 0x40 : 'W25Q'}
     SIZES = {0x11: 1 << 17, 0x12: 1 << 18, 0x13: 1 << 19, 0x14: 1 << 20,
-             0x15: 2 << 20, 0x16: 4 << 20, 0x17: 8 << 20 }
+             0x15: 2 << 20, 0x16: 4 << 20, 0x17: 8 << 20, 0x18: 16 << 20}
     SPI_FREQ_MAX = 104 # MHz
     CMD_READ_UID = 0x4B
     UID_LEN = 0x8 # 64 bits
