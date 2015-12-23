@@ -7,10 +7,10 @@
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included in all
 # copies or substantial portions of the Software.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -62,6 +62,11 @@ class SerialFlash(object):
     FEAT_SECTERASE = 0x100    # Can erase whole sectors
     FEAT_HSECTERASE = 0x200   # Can erase half sectors
     FEAT_SUBSECTERASE = 0x400 # Can erase sub sectors
+
+    def set_spi_frequency(self, freq=None):
+        """Set the SPI bus frequency to communicate with the device. Set
+           default SPI frequency if none is provided."""
+        raise NotImplementedError()
 
     def read(self, address, length):
         """Read a sequence of bytes from the specified address."""
@@ -137,17 +142,21 @@ class SerialFlashManager(object):
     CMD_JEDEC_ID = 0x9F
 
     @staticmethod
-    def get_flash_device(vendor, product, interface=1, cs=0):
+    def get_flash_device(vendor, product, interface=1, cs=0, freq=None):
         """Obtain an instance of the detected flash device"""
         ctrl = SpiController(silent_clock=False)
         ctrl.configure(vendor, product, interface)
         spi = ctrl.get_port(cs)
+        if freq:
+            spi.set_frequency(freq)
         jedec = SerialFlashManager.read_jedec_id(spi)
         if not jedec:
             # it is likely that the latency setting is too low if this
             # condition is encountered
             raise SerialFlashUnknownJedec("Unable to read JEDEC Id")
-        return SerialFlashManager._get_flash(spi, jedec)
+        flash = SerialFlashManager._get_flash(spi, jedec)
+        flash.set_spi_frequency(freq)
+        return flash
 
     @staticmethod
     def read_jedec_id(spi):
@@ -424,6 +433,11 @@ class _Gen25FlashDevice(_SpiFlashDevice):
     def __len__(self):
         return self._size
 
+    def set_spi_frequency(self, freq=None):
+        default_freq = self.SPI_FREQ_MAX*1E06
+        freq = freq and min(default_freq, freq) or default_freq
+        self._spi.set_frequency(freq)
+
     def get_size(self, kind):
         try:
             div = getattr(self, '%s_DIV' % kind.upper())
@@ -657,7 +671,6 @@ class S25FlFlashDevice(_Gen25FlashDevice):
         device, capacity = _SpiFlashDevice.jedec2int(jedec)[1:3]
         self._device = self.DEVICES[device]
         self._size = S25FlFlashDevice.SIZES[capacity]
-        self._spi.set_frequency(S25FlFlashDevice.SPI_FREQ_MAX*1E06)
 
     def __str__(self):
         return 'Spansion %s %s' % \
@@ -744,7 +757,6 @@ class M25PxFlashDevice(_Gen25FlashDevice):
         device, capacity = _SpiFlashDevice.jedec2int(jedec)[1:3]
         self._device = self.DEVICES[device]
         self._size = M25PxFlashDevice.SIZES[capacity]
-        self._spi.set_frequency(M25PxFlashDevice.SPI_FREQ_MAX*1E06)
 
     def __str__(self):
         return 'Numonix %s%d %s' % \
@@ -779,7 +791,6 @@ class W25xFlashDevice(_Gen25FlashDevice):
         device, capacity = _SpiFlashDevice.jedec2int(jedec)[1:3]
         self._device = self.DEVICES[device]
         self._size = W25xFlashDevice.SIZES[capacity]
-        self._spi.set_frequency(W25xFlashDevice.SPI_FREQ_MAX*1E06)
 
     def __str__(self):
         return 'Winbond %s%d %s' % \
@@ -820,7 +831,6 @@ class Mx25lFlashDevice(_Gen25FlashDevice):
         device, capacity = _SpiFlashDevice.jedec2int(jedec)[1:]
         self._size = self.SIZES[capacity]
         self._device = self.DEVICES[device]
-        self._spi.set_frequency(Mx25lFlashDevice.SPI_FREQ_MAX*1E06)
 
     def __str__(self):
         return 'Macronix %s%d %s' % \
@@ -861,7 +871,6 @@ class En25qFlashDevice(_Gen25FlashDevice):
         capacity = _SpiFlashDevice.jedec2int(jedec)[-1]
         self._size = En25qFlashDevice.SIZES[capacity]
         self._device = self.DEVICES[device]
-        self._spi.set_frequency(En25qFlashDevice.SPI_FREQ_MAX*1E06)
 
     def __str__(self):
         return 'Eon %s%d %s' % \
@@ -900,7 +909,6 @@ class At25FlashDevice(_Gen25FlashDevice):
         capacity = _SpiFlashDevice.jedec2int(jedec)[1]
         self._size = At25FlashDevice.SIZES[capacity]
         self._device = 'AT25DF'
-        self._spi.set_frequency(At25FlashDevice.SPI_FREQ_MAX*1E06)
 
     def __str__(self):
         return 'Atmel %s%d %s' % \
@@ -1042,6 +1050,11 @@ class At45FlashDevice(_SpiFlashDevice):
         self._device = 'AT45DB'
         self._spi.set_frequency(self.SPI_FREQS_MAX[self._devidx]*1E06)
         self._fix_page_size()
+
+    def set_spi_frequency(self, freq):
+        default_freq = self.SPI_FREQS_MAX[self._devidx]*1E06
+        freq = freq and min(default_freq, freq) or default_freq
+        self._spi.set_frequency(freq)
 
     def __len__(self):
         return self._size
@@ -1193,7 +1206,6 @@ class N25QFlashDevice(_Gen25FlashDevice):
         device, capacity = _SpiFlashDevice.jedec2int(jedec)[1:]
         self._size = self.SIZES[capacity]
         self._device = self.DEVICES[device]
-        self._spi.set_frequency(N25QFlashDevice.SPI_FREQ_MAX*1E06)
 
     def __str__(self):
         return 'Micron %s%03d %s' % \
@@ -1211,5 +1223,3 @@ class N25QFlashDevice(_Gen25FlashDevice):
                                (0<<self.SECTOR_LOCK_DOWN) |
                                (0<<self.SECTOR_WRITE_LOCK)])
         self._spi.exchange(wcmd)
-
-
