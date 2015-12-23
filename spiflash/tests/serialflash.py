@@ -8,10 +8,10 @@
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included in all
 # copies or substantial portions of the Software.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -37,6 +37,24 @@ class SerialFlashTestCase(unittest.TestCase):
 
     def tearDown(self):
         del self.flash
+
+    def osc_readout(self):
+        print "Flash device: %s @ SPI freq %0.1f MHz" % \
+            (self.flash, self.flash.spi_frequency/1E6)
+        delta = time.time()
+        data = self.flash.read(0, 256)
+        delta = time.time()-delta
+        length = len(data)
+        self._report_bw('Read', length, delta)
+        from binascii import hexlify
+        for x in range(0, 256, 16):
+            print hexlify(data[x:x+16])
+
+    def osc_write(self):
+        self.flash.unlock()
+        self.flash.erase(0x0, 4096)
+        s = ''.join([chr(x) for x in range(256)])
+        self.flash.write(0x0, s)
 
     def test_flashdevice_1_name(self):
         """Retrieve device name
@@ -161,7 +179,7 @@ class SerialFlashTestCase(unittest.TestCase):
         else:
             print "%s %s in %d seconds @ %s/s" % (action, pretty_size(length),
                 time, pretty_size(length/time))
-        
+
 def suite():
     return unittest.makeSuite(SerialFlashTestCase, 'test')
 
