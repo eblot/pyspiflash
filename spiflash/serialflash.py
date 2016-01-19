@@ -647,8 +647,8 @@ class S25FlFlashDevice(_Gen25FlashDevice):
     """Spansion S25FL flash device implementation"""
 
     JEDEC_ID = 0x01
-    DEVICES = { 0x02 : 'S25FL' }
-    SIZES = { 0x15 : 4<<20, 0x16 : 8<<20 }
+    DEVICES = { 0x02 : 'S25FL', 0x40 : 'S25FL1-K' }
+    SIZES = { 0x15 : 4<<20, 0x16 : 8<<20, 0x17 : 0x40<<20 }
     CR_FREEZE = 0x01
     CR_QUAD = 0x02
     CR_TBPARM = 0x04
