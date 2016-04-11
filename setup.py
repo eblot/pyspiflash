@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2010-2015 Emmanuel Blot <emmanuel.blot@free.fr>
+# Copyright (c) 2010-2016 Emmanuel Blot <emmanuel.blot@free.fr>
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -49,8 +49,8 @@ setup(
                  VERSION,
     packages=['spiflash'],
     package_data={'spiflash': ['*.rst']},
-    requires=['pyftdi (>= 0.11.0)'],
-    install_requires=['pyftdi>=0.11.0'],
+    requires=['pyftdi (>= 0.11.0)', 'six'],
+    install_requires=['pyftdi>=0.11.0', 'six'],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Other Environment',
@@ -60,6 +60,8 @@ setup(
         'Operating System :: POSIX',
         'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
         'Topic :: Software Development :: Libraries :: Python Modules',
         'Topic :: System :: Hardware :: Hardware Drivers',
     ],
