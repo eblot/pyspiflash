@@ -670,8 +670,10 @@ class S25FlFlashDevice(_Gen25FlashDevice):
                'subsector': (0.2, 0.8),  # 200/800 ms
                'sector': (0.5, 2.0),  # 0.5/2 s
                'bulk': (32, 64),  # seconds
-               'lock': (0.0015, 0.003),  # 1.5/3 ms
+               'lock': (0.006, 0.012),  # 6/12 ms
                }
+    FEATURES = SerialFlash.FEAT_SECTERASE | \
+               SerialFlash.FEAT_SUBSECTERASE
 
     def __init__(self, spi, jedec):
         super(S25FlFlashDevice, self).__init__(spi)
