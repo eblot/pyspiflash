@@ -22,10 +22,11 @@
 import sys
 import time
 from array import array as Array
-from pyftdi.ftdi import Ftdi
 from pyftdi.spi import SpiController
 from pyftdi.misc import hexdump, pretty_size
+from six import PY3
 from six.moves import range
+
 
 class SerialFlashError(Exception):
     """Base class for all Serial Flash errors"""
@@ -168,7 +169,10 @@ class SerialFlashManager(object):
     def read_jedec_id(spi):
         """Read flash device JEDEC identifier (3 bytes)"""
         jedec_cmd = Array('B', (SerialFlashManager.CMD_JEDEC_ID,))
-        return spi.exchange(jedec_cmd, 3).tostring()
+        if PY3:
+            return spi.exchange(jedec_cmd, 3).tobytes()
+        else:
+            return spi.exchange(jedec_cmd, 3).tostring()
 
     @staticmethod
     def _get_flash(spi, jedec):
