@@ -49,8 +49,8 @@ setup(
                  VERSION,
     packages=['spiflash'],
     package_data={'spiflash': ['*.rst']},
-    requires=['pyftdi (>= 0.11.0)', 'six'],
-    install_requires=['pyftdi>=0.11.0', 'six'],
+    requires=['pyftdi (>= 0.13.0)', 'six'],
+    install_requires=['pyftdi>=0.13.0', 'six'],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Other Environment',
