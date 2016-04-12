@@ -8,8 +8,8 @@
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
 #
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 #
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -23,7 +23,7 @@ import sys
 import time
 from array import array as Array
 from pyftdi.spi import SpiController
-from pyftdi.misc import hexdump, pretty_size
+from pyftdi.misc import pretty_size
 from six import PY3
 from six.moves import range
 
@@ -40,7 +40,7 @@ class SerialFlashUnknownJedec(SerialFlashNotSupported):
     """Exception thrown when a JEDEC identifier is not recognized"""
     def __init__(self, jedec):
         from binascii import hexlify
-        SerialFlashNotSupported.__init__(self, "Unknown flash device: %s" % \
+        SerialFlashNotSupported.__init__(self, "Unknown flash device: %s" %
                                          hexlify(jedec))
 
 
@@ -364,8 +364,7 @@ class _SpiFlashDevice(SerialFlash):
         data = self.read(address, length)
         count = data.count(refbyte)
         if count != length:
-            raise SerialFlashError('%d bytes are not erased' %
-                                   length-count)
+            raise SerialFlashError('%d bytes are not erased' % length-count)
 
     def _wait_for_completion(self, times):
         typical_time, max_time = times
@@ -525,7 +524,6 @@ class _Gen25FlashDevice(_SpiFlashDevice):
 
     def _read_status(self):
         read_cmd = Array('B', (self.CMD_READ_STATUS,))
-        #self._spi.flush()
         data = self._spi.exchange(read_cmd, 1)
         if len(data) != 1:
             raise SerialFlashTimeout("Unable to retrieve flash status")
@@ -590,11 +588,10 @@ class Sst25FlashDevice(_Gen25FlashDevice):
     TIMINGS = {'subsector': (0.025, 0.025),  # 25 ms
                'hsector': (0.025, 0.025),  # 25 ms
                'sector': (0.025, 0.025),  # 25 ms
-               'lock': (0.0, 0.0),  # immediate
-               }
-    FEATURES = SerialFlash.FEAT_SECTERASE | \
-               SerialFlash.FEAT_SUBSECTERASE | \
-               SerialFlash.FEAT_HSECTERASE
+               'lock': (0.0, 0.0)}  # immediate
+    FEATURES = (SerialFlash.FEAT_SECTERASE |
+                SerialFlash.FEAT_SUBSECTERASE |
+                SerialFlash.FEAT_HSECTERASE)
 
     def __init__(self, spi, jedec):
         super(Sst25FlashDevice, self).__init__(spi)
@@ -606,7 +603,7 @@ class Sst25FlashDevice(_Gen25FlashDevice):
 
     def __str__(self):
         return 'SST %s %s' % \
-            (self._device, pretty_size(self._size, lim_m=1<<20))
+            (self._device, pretty_size(self._size, lim_m=1 << 20))
 
     def write(self, address, data):
         """SST25 uses a very specific implementation to write data. It offers
@@ -630,9 +627,7 @@ class Sst25FlashDevice(_Gen25FlashDevice):
                               address & 0xff,
                               data.pop(0), data.pop(0)))
         offset = 0
-        percent = 0.0
         while True:
-            percent = (1000.0*offset/length)
             offset += 2
             self._spi.exchange(aai_cmd)
             while self.is_busy():
@@ -671,10 +666,9 @@ class S25FlFlashDevice(_Gen25FlashDevice):
                'subsector': (0.2, 0.8),  # 200/800 ms
                'sector': (0.5, 2.0),  # 0.5/2 s
                'bulk': (32, 64),  # seconds
-               'lock': (0.0015, 0.100),  # 1.5/100 ms
-               }
-    FEATURES = SerialFlash.FEAT_SECTERASE | \
-               SerialFlash.FEAT_SUBSECTERASE
+                'lock' : (0.0015, 0.1)} # 1.5/100 ms
+    FEATURES = (SerialFlash.FEAT_SECTERASE |
+                SerialFlash.FEAT_SUBSECTERASE)
 
     def __init__(self, spi, jedec):
         super(S25FlFlashDevice, self).__init__(spi)
@@ -749,10 +743,8 @@ class M25PxFlashDevice(_Gen25FlashDevice):
                'subsector': (0.150, 0.150),  # 150/150 ms
                'sector': (3.0, 3.0),  # 3/3 s
                'bulk': (32, 64),  # seconds
-               'lock': (0.0015, 0.003),  # 1.5/3 ms
-               }
-    FEATURES = SerialFlash.FEAT_SECTERASE | \
-               SerialFlash.FEAT_SUBSECTERASE
+               'lock': (0.0015, 0.003)}  # 1.5/3 ms
+    FEATURES = SerialFlash.FEAT_SECTERASE | SerialFlash.FEAT_SUBSECTERASE
 
     def __init__(self, spi, jedec):
         super(M25PxFlashDevice, self).__init__(spi)
@@ -783,10 +775,8 @@ class W25xFlashDevice(_Gen25FlashDevice):
                'subsector': (0.200, 0.200),  # 200/200 ms
                'sector': (1.0, 1.0),  # 1/1 s
                'bulk': (32, 64),  # seconds
-               'lock': (0.05, 0.1),  # 50/100 ms
-               }
-    FEATURES = SerialFlash.FEAT_SECTERASE | \
-               SerialFlash.FEAT_SUBSECTERASE
+               'lock': (0.05, 0.1)}  # 50/100 ms
+    FEATURES = SerialFlash.FEAT_SECTERASE | SerialFlash.FEAT_SUBSECTERASE
 
     def __init__(self, spi, jedec):
         super(W25xFlashDevice, self).__init__(spi)
@@ -814,11 +804,10 @@ class Mx25lFlashDevice(_Gen25FlashDevice):
                'hsector': (2.0, 2.0),  # 2/2 s
                'sector': (2.0, 2.0),  # 2/2 s
                'bulk': (32, 64),  # seconds
-               'lock': (0.0015, 0.003),  # 1.5/3 ms
-               }
-    FEATURES = SerialFlash.FEAT_SECTERASE | \
-               SerialFlash.FEAT_HSECTERASE | \
-               SerialFlash.FEAT_SUBSECTERASE
+               'lock': (0.0015, 0.003)}  # 1.5/3 ms
+    FEATURES = (SerialFlash.FEAT_SECTERASE |
+                SerialFlash.FEAT_HSECTERASE |
+                SerialFlash.FEAT_SUBSECTERASE)
     CMD_UNLOCK = 0xF3
     CMD_GBULK = 0x98
     CMD_RDBLOCK = 0xFB
@@ -863,16 +852,14 @@ class En25qFlashDevice(_Gen25FlashDevice):
                'subsector': (0.300, 0.300),  # 300/300 ms
                'sector': (2.0, 2.0),  # 2/2 s
                'bulk': (32, 64),  # seconds
-               'lock': (0.0015, 0.003),  # 1.5/3 ms
-               }
-    FEATURES = SerialFlash.FEAT_SECTERASE | \
-               SerialFlash.FEAT_SUBSECTERASE
+               'lock': (0.0015, 0.003)}  # 1.5/3 ms
+    FEATURES = SerialFlash.FEAT_SECTERASE | SerialFlash.FEAT_SUBSECTERASE
 
     def __init__(self, spi, jedec):
         super(En25qFlashDevice, self).__init__(spi)
         if not En25qFlashDevice.match(jedec):
             raise SerialFlashUnknownJedec(jedec)
-        device, capacity = _SpiFlashDevice.jedec2int(jedec)[1:3]
+        device, capacity = _SpiFlashDevice.jedec2int(jedec)[1:]
         self._size = En25qFlashDevice.SIZES[capacity]
         self._device = self.DEVICES[device]
 
@@ -892,10 +879,8 @@ class At25FlashDevice(_Gen25FlashDevice):
                'subsector': (0.200, 0.200),  # 200/200 ms
                'sector': (0.950, 0.950),  # 950/950 ms
                'bulk': (32, 64),  # seconds
-               'lock': (0.0015, 0.003),  # 1.5/3 ms
-               }
-    FEATURES = SerialFlash.FEAT_SECTERASE | \
-               SerialFlash.FEAT_SUBSECTERASE
+               'lock': (0.0015, 0.003)}  # 1.5/3 ms
+    FEATURES = SerialFlash.FEAT_SECTERASE | SerialFlash.FEAT_SUBSECTERASE
 
     CMD_PROTECT_SOFT_WRITE = 0x36
     CMD_PROTECT_LOCK_WRITE = 0x33
@@ -950,6 +935,7 @@ class At25FlashDevice(_Gen25FlashDevice):
             self._spi.exchange(wcmd)
             self._wait_for_completion(self.get_timings('page'))
 
+
 class At45FlashDevice(_SpiFlashDevice):
     """Flash device implementation for AT45 (Atmel/Adesto)
 
@@ -1000,8 +986,7 @@ class At45FlashDevice(_SpiFlashDevice):
                         (1.0, 2.0),
                         (1.0, 2.0),
                         (1.0, 2.0)]}
-    FEATURES = SerialFlash.FEAT_SECTERASE | \
-               SerialFlash.FEAT_SUBSECTERASE
+    FEATURES = SerialFlash.FEAT_SECTERASE | SerialFlash.FEAT_SUBSECTERASE
 
     DEVICE_ID = 0x01
     DEVICE_MASK = 0x07
@@ -1048,7 +1033,7 @@ class At45FlashDevice(_SpiFlashDevice):
         if not At45FlashDevice.match(jedec):
             raise SerialFlashUnknownJedec(jedec)
         code = _SpiFlashDevice.jedec2int(jedec)[1]
-        capacity = (code>>self.CAPACITY_SHIFT) & self.CAPACITY_MASK
+        capacity = (code >> self.CAPACITY_SHIFT) & self.CAPACITY_MASK
         self._devidx = capacity-2
         assert 0 <= self._devidx < len(self.PAGE_DIV)
         self._size = self.get_size('chip')
@@ -1198,10 +1183,8 @@ class N25QFlashDevice(_Gen25FlashDevice):
     TIMINGS = {'page': (0.0005, 0.005),  # 0.5/5 ms
                'subsector': (0.3, 3.0),  # 300/3000 ms
                'sector': (0.7, 3.0),  # 700/3000 ms
-               'bulk': (60, 120),  # seconds
-               }
-    FEATURES = SerialFlash.FEAT_SECTERASE | \
-               SerialFlash.FEAT_SUBSECTERASE
+               'bulk': (60, 120)}  # seconds
+    FEATURES = SerialFlash.FEAT_SECTERASE | SerialFlash.FEAT_SUBSECTERASE
     CMD_WRLR = 0xE5
     SECTOR_LOCK_DOWN = 1
     SECTOR_WRITE_LOCK = 0
