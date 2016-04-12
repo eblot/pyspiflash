@@ -466,7 +466,7 @@ class _Gen25FlashDevice(_SpiFlashDevice):
             # all '25' devices use the same class properties
             features = cls.FEATURES
         except AttributeError:
-            raise AssertionError('Implementation error: no FEATURES defined')
+            raise NotImplemented('No FEATURES defined')
         return bool(features & feature)
 
     def get_timings(self, time_):
@@ -670,7 +670,7 @@ class S25FlFlashDevice(_Gen25FlashDevice):
                'subsector': (0.2, 0.8),  # 200/800 ms
                'sector': (0.5, 2.0),  # 0.5/2 s
                'bulk': (32, 64),  # seconds
-               'lock': (0.006, 0.012),  # 6/12 ms
+               'lock': (0.0015, 0.100),  # 1.5/100 ms
                }
     FEATURES = SerialFlash.FEAT_SECTERASE | \
                SerialFlash.FEAT_SUBSECTERASE
@@ -686,14 +686,6 @@ class S25FlFlashDevice(_Gen25FlashDevice):
     def __str__(self):
         return 'Spansion %s %s' % \
             (self._device, pretty_size(self._size, lim_m=1<<20))
-
-    @property
-    def features(self):
-        """Flash device features"""
-        # note that subsector erasure is only supported for a 2 * sectorsize
-        # -long area at start OR end of the flash. can_erase asserts this
-        # condition
-        return SerialFlash.FEAT_SECTERASE|SerialFlash.FEAT_SUBSECTERASE
 
     def can_erase(self, address, length):
         """Verifies that a defined area can be erased on the Spansion flash
