@@ -364,8 +364,8 @@ class _SpiFlashDevice(SerialFlash):
         data = self.read(address, length)
         count = data.count(refbyte)
         if count != length:
-            raise AssertionError('%d bytes are not erased' %
-                                 length-count)
+            raise SerialFlashError('%d bytes are not erased' %
+                                   length-count)
 
     def _wait_for_completion(self, times):
         typical_time, max_time = times
@@ -452,7 +452,8 @@ class _Gen25FlashDevice(_SpiFlashDevice):
             div = getattr(self, '%s_DIV' % kind.upper())
             return 1 << div
         except AttributeError:
-            raise AssertionError('%s size is not supported' % kind.title())
+            raise SerialFlashNotSupported('%s size is not supported' %
+                                          kind.title())
 
     @classmethod
     def get_erase_command(cls, block):
@@ -466,7 +467,7 @@ class _Gen25FlashDevice(_SpiFlashDevice):
             # all '25' devices use the same class properties
             features = cls.FEATURES
         except AttributeError:
-            raise NotImplemented('No FEATURES defined')
+            raise NotImplementedError('No FEATURES defined')
         return bool(features & feature)
 
     def get_timings(self, time_):
@@ -475,7 +476,7 @@ class _Gen25FlashDevice(_SpiFlashDevice):
             # all '25' devices use the same class properties
             timings = self.TIMINGS
         except AttributeError:
-            raise AssertionError('Implementation error: no TIMINGS defined')
+            raise NotImplementedError('no TIMINGS defined')
         return timings[time_]
 
     @classmethod
@@ -620,7 +621,7 @@ class Sst25FlashDevice(_Gen25FlashDevice):
             data = Array('B', data)
         length = len(data)
         if (address & 0x1) or (length & 0x1) or (length == 0):
-            raise AssertionError("Alignement/size not supported")
+            raise SerialFlashNotSupported("Alignement/size not supported")
         self._unprotect()
         self._enable_write()
         aai_cmd = Array('B', (Sst25FlashDevice.CMD_PROGRAM_WORD,
@@ -1071,7 +1072,8 @@ class At45FlashDevice(_SpiFlashDevice):
             divs = getattr(self, '%s_DIV' % kind.upper())
             return 1 << divs[self._devidx]
         except AttributeError:
-            raise AssertionError('%s erase is not supported' % kind.title())
+            raise SerialFlashNotSupported('%s erase is not supported' %
+                                          kind.title())
 
     @classmethod
     def get_erase_command(cls, block):

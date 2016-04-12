@@ -86,7 +86,7 @@ class SerialFlashTestCase(unittest.TestCase):
         # reached
         length = min(len(self.flash), size)
         start = len(self.flash)-length
-        print_("Erase %s from flash @ 0x%06x(may take a while...)" %
+        print_("Erase %s from flash @ 0x%06x (may take a while...)" %
                (pretty_size(length), start))
         delta = time.time()
         self.flash.unlock()
@@ -152,7 +152,7 @@ class SerialFlashTestCase(unittest.TestCase):
                     # Stop report after 16 errors
                     if errcount >= 32:
                         break
-            raise AssertionError('Data comparison mismatch')
+            raise self.fail('Data comparison mismatch')
 
     @classmethod
     def _report_bw(cls, action, length, time_):
