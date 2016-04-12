@@ -673,7 +673,8 @@ class S25FlFlashDevice(_Gen25FlashDevice):
                'bulk': (32, 64),  # seconds
                'lock': (0.0015, 0.100),  # 1.5/100 ms
                }
-    FEATURES = SerialFlash.FEAT_SECTERASE
+    FEATURES = SerialFlash.FEAT_SECTERASE | \
+               SerialFlash.FEAT_SUBSECTERASE
 
     def __init__(self, spi, jedec):
         super(S25FlFlashDevice, self).__init__(spi)
@@ -685,7 +686,7 @@ class S25FlFlashDevice(_Gen25FlashDevice):
 
     def __str__(self):
         return 'Spansion %s %s' % \
-            (self._device, pretty_size(self._size, lim_m=1<<20))
+            (self._device, pretty_size(self._size, lim_m=1 << 20))
 
     def can_erase(self, address, length):
         """Verifies that a defined area can be erased on the Spansion flash
