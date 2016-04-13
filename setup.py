@@ -9,10 +9,10 @@
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-# 
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-# 
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -31,6 +31,7 @@ except ImportError:
     from distutils.core import setup
 from spiflash import __version__ as VERSION
 
+
 def _read(fname):
     import os
     return open(os.path.join(os.path.dirname(__file__), 'spiflash',
@@ -43,14 +44,14 @@ setup(
     author='Emmanuel Blot',
     author_email='emmanuel.blot@free.fr',
     license='MIT',
-    keywords = 'driver ftdi usb serial spi flash mtd',
+    keywords='driver ftdi usb serial spi flash mtd',
     url='http://github.com/eblot/pyspiflash',
-    download_url='https://github.com/eblot/pyspiflash/archive/v%s.tar.gz' % \
+    download_url='https://github.com/eblot/pyspiflash/archive/v%s.tar.gz' %
                  VERSION,
     packages=['spiflash'],
     package_data={'spiflash': ['*.rst']},
-    requires=['pyftdi (>= 0.13.0)', 'six'],
-    install_requires=['pyftdi>=0.13.0', 'six'],
+    requires=['pyftdi (>= 0.13.2)', 'six'],
+    install_requires=['pyftdi>=0.13.2', 'six'],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Other Environment',
@@ -67,4 +68,3 @@ setup(
     ],
     long_description=_read('README.rst'),
 )
-

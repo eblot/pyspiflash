@@ -90,6 +90,10 @@ Unlock
 Dependencies
 ------------
 
+Python_ 2.6 or above is required. Python_ 3.4 or above is also supported.
+
+Since PySpiFlash_ 0.4, Six_ compatibility library is also required.
+
 PySpiFlash_ relies on PyFtdi_ module to access the SPI flash device. The
 internal API of PyFtdi_ has been changed with version 0.11.0.
 
@@ -98,4 +102,7 @@ PySpiFlash_ version  PyFtdi_ version
 -------------------- ---------------
 0.2.*                0.9 .. 0.10
 0.3.*                0.11+
+0.4.*                0.13.2+
 ==================== ===============
+
+.. _Six: https://pythonhosted.org/six/
