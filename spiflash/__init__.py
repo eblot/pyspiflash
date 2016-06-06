@@ -19,5 +19,5 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-version_info = (0, 4, 0)
+version_info = (0, 4, 1)
 __version__ = '.'.join(['%d' % v for v in version_info])

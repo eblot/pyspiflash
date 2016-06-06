@@ -8,10 +8,10 @@
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-# 
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-# 
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -62,7 +62,7 @@ class SerialFlashTestCase(unittest.TestCase):
         data = self.flash.read(0x007020, 128)
         ref = Array('B', [0xff] * 128)
         self.assertEqual(data, ref)
-        string = 'This is a serial SPI flash test.'
+        string = 'This is a serial SPI flash test.' * 3
         ref2 = Array('B', string.encode('ascii'))
         self.flash.write(0x007020, ref2)
         data = self.flash.read(0x007020, 128)
@@ -133,8 +133,8 @@ class SerialFlashTestCase(unittest.TestCase):
         data = self.flash.read(start, length)
         delta = time.time()-delta
         self._report_bw('Read', length, delta)
-        #print "Dump flash"
-        #print hexdump(data.tostring())
+        # print "Dump flash"
+        # print hexdump(data.tostring())
         print_("Verify flash")
         rmd = sha1()
         rmd.update(data.tostring())

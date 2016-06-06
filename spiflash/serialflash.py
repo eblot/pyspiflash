@@ -364,7 +364,7 @@ class _SpiFlashDevice(SerialFlash):
         data = self.read(address, length)
         count = data.count(refbyte)
         if count != length:
-            raise SerialFlashError('%d bytes are not erased' % length-count)
+            raise SerialFlashError('%d bytes are not erased' % (length-count))
 
     def _wait_for_completion(self, times):
         typical_time, max_time = times
