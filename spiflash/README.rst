@@ -42,7 +42,7 @@ Notes about performances
   limit comes mostly from the maximum write packet size of the device, as the
   device needs to be polled for completion after each packet: the shorter the
   packet, the higher traffic on the SPI and associated overhead.
-* *Erase* operation depends mostly on the flash device performance, whose fully 
+* *Erase* operation depends mostly on the flash device performance, whose fully
   depends on the flash device internal technology, as very few and short
   packets are exchanged over the SPI bus.
 
@@ -55,7 +55,7 @@ advanced security features of these devices.
 
 It should be nevertheless quite easy to add support for new flash device
 variants:
- 
+
 * ``match`` method in the PyFtdi flash device API should be the first to look
   at to detect more compatible flash devices.
 
@@ -90,12 +90,22 @@ Unlock
 Dependencies
 ------------
 
-Python_ 2.6 or above is required. Python_ 3.4 or above is also supported.
+* Python_ 3.5 or above is required.
+* PyFTDI_ 0.20 or above is required.
 
-Since PySpiFlash_ 0.4, Six_ compatibility library is also required.
+Note about previous releases
+............................
 
-PySpiFlash_ relies on PyFtdi_ module to access the SPI flash device. The
-internal API of PyFtdi_ has been changed with version 0.11.0.
+If you have no choice but using previous releases of Python (including Python
+2.x) or PyFTDI_ , please checkout the latest PySpiFlash_ 0.4.1 which provides
+support for these deprecated environmement, but is no longer actively
+maintained.
+
+PySpiFlash_ heavily relies on PyFtdi_ module to access the SPI flash device.
+The PyFtdi_ API has been changed several times, see the compatibility matrix
+below.
+
+The ``setup.py`` script should take care of those dependencies.
 
 ==================== ===============
 PySpiFlash_ version  PyFtdi_ version
@@ -103,6 +113,5 @@ PySpiFlash_ version  PyFtdi_ version
 0.2.*                0.9 .. 0.10
 0.3.*                0.11+
 0.4.*                0.13.2+
+0.5.*                0.20.0+
 ==================== ===============
-
-.. _Six: https://pythonhosted.org/six/

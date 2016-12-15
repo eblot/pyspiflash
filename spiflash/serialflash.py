@@ -24,8 +24,6 @@ import time
 from array import array as Array
 from pyftdi.spi import SpiController
 from pyftdi.misc import pretty_size
-from six import PY3
-from six.moves import range
 
 
 class SerialFlashError(Exception):
@@ -38,6 +36,7 @@ class SerialFlashNotSupported(SerialFlashError):
 
 class SerialFlashUnknownJedec(SerialFlashNotSupported):
     """Exception thrown when a JEDEC identifier is not recognized"""
+
     def __init__(self, jedec):
         from binascii import hexlify
         SerialFlashNotSupported.__init__(self, "Unknown flash device: %s" %
@@ -169,10 +168,7 @@ class SerialFlashManager(object):
     def read_jedec_id(spi):
         """Read flash device JEDEC identifier (3 bytes)"""
         jedec_cmd = Array('B', (SerialFlashManager.CMD_JEDEC_ID,))
-        if PY3:
-            return spi.exchange(jedec_cmd, 3).tobytes()
-        else:
-            return spi.exchange(jedec_cmd, 3).tostring()
+        return spi.exchange(jedec_cmd, 3).tobytes()
 
     @staticmethod
     def _get_flash(spi, jedec):
@@ -666,7 +662,7 @@ class S25FlFlashDevice(_Gen25FlashDevice):
                'subsector': (0.2, 0.8),  # 200/800 ms
                'sector': (0.5, 2.0),  # 0.5/2 s
                'bulk': (32, 64),  # seconds
-                'lock' : (0.0015, 0.1)} # 1.5/100 ms
+               'lock': (0.0015, 0.1)}  # 1.5/100 ms
     FEATURES = (SerialFlash.FEAT_SECTERASE |
                 SerialFlash.FEAT_SUBSECTERASE)
 
