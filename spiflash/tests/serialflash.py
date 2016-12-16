@@ -120,7 +120,7 @@ class SerialFlashTestCase(unittest.TestCase):
             buf = Array('B')
             back = Array('B')
             buf.extend((randint(0, 255) for _ in range(0, length)))
-        bufstr = buf.tostring()
+        bufstr = buf.tobytes()
         print("Writing %s to flash (may take a while...)" %
               pretty_size(len(bufstr)))
         delta = now()
@@ -129,7 +129,7 @@ class SerialFlashTestCase(unittest.TestCase):
         length = len(bufstr)
         self._report_bw('Wrote', length, delta)
         wmd = sha1()
-        wmd.update(buf.tostring())
+        wmd.update(buf.tobytes())
         refdigest = wmd.hexdigest()
         print("Reading %s from flash" % pretty_size(length))
         delta = now()
@@ -137,10 +137,10 @@ class SerialFlashTestCase(unittest.TestCase):
         delta = now()-delta
         self._report_bw('Read', length, delta)
         # print "Dump flash"
-        # print hexdump(data.tostring())
+        # print hexdump(data.tobytes())
         print("Verify flash")
         rmd = sha1()
-        rmd.update(data.tostring())
+        rmd.update(data.tobytes())
         newdigest = rmd.hexdigest()
         print("Reference:", refdigest)
         print("Retrieved:", newdigest)
