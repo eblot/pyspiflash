@@ -22,6 +22,7 @@
 import sys
 import time
 from array import array as Array
+from binascii import hexlify
 from pyftdi.spi import SpiController
 from pyftdi.misc import pretty_size
 
@@ -38,7 +39,6 @@ class SerialFlashUnknownJedec(SerialFlashNotSupported):
     """Exception thrown when a JEDEC identifier is not recognized"""
 
     def __init__(self, jedec):
-        from binascii import hexlify
         SerialFlashNotSupported.__init__(self, "Unknown flash device: %s" %
                                          hexlify(jedec))
 
@@ -148,10 +148,10 @@ class SerialFlashManager(object):
     CMD_JEDEC_ID = 0x9F
 
     @staticmethod
-    def get_flash_device(vendor, product, interface=1, cs=0, freq=None):
+    def get_flash_device(url, cs=0, freq=None):
         """Obtain an instance of the detected flash device"""
         ctrl = SpiController(silent_clock=False)
-        ctrl.configure(vendor, product, interface)
+        ctrl.configure(url)
         spi = ctrl.get_port(cs)
         if freq:
             spi.set_frequency(freq)

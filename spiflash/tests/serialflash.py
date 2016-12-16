@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) 2011-2016, Emmanuel Blot <emmanuel.blot@free.fr>
 # All rights reserved.
 #
@@ -22,6 +22,7 @@
 
 from array import array as Array
 from hashlib import sha1
+from os import environ
 from pyftdi.misc import hexdump, pretty_size
 from spiflash.serialflash import SerialFlashManager
 from random import randint, seed
@@ -31,9 +32,14 @@ import unittest
 
 class SerialFlashTestCase(unittest.TestCase):
 
+    @classmethod
+    def setUpClass(cls):
+        # FTDI device should be defined to your actual setup
+        cls.ftdi_url = environ.get('FTDI_DEVICE', 'ftdi://ftdi:2232/1')
+        print('Using FTDI device %s' % cls.ftdi_url)
+
     def setUp(self):
-        # FTDI device should be tweak to your actual setup
-        self.flash = SerialFlashManager.get_flash_device(0x403, 0x6010, 1)
+        self.flash = SerialFlashManager.get_flash_device(self.ftdi_url)
 
     def tearDown(self):
         del self.flash
