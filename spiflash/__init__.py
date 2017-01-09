@@ -1,4 +1,4 @@
-# Copyright (c) 2010-2016, Emmanuel Blot <emmanuel.blot@free.fr>
+# Copyright (c) 2010-2017, Emmanuel Blot <emmanuel.blot@free.fr>
 # All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,5 +19,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-version_info = (0, 5, 0)
-__version__ = '.'.join(['%d' % v for v in version_info])
+__version__ = '0.5.0'
+__title__ = 'pyspiflash'
+__description__ = 'SPI data flash device drivers (pure Python)'
+__uri__ = 'http://github.com/eblot/pyspiflash'
+__doc__ = __description__ + ' <' + __uri__ + '>'
+__author__ = 'Emmanuel Blot'
+__email__ = 'emmanuel.blot@free.fr'
+__license__ = 'MIT'
+__copyright__ = 'Copyright (c) 2011-2017 Emmanuel Blot'

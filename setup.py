@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2010-2016 Emmanuel Blot <emmanuel.blot@free.fr>
+# Copyright (c) 2010-2017 Emmanuel Blot <emmanuel.blot@free.fr>
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -21,47 +21,78 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-try:
-    # try to use setuptools first, so extended command set such as
-    # python setup.py develop is available
-    from setuptools import setup
-except ImportError:
-    # if setuptools package is not available, fall back to the default
-    # distribution package.
-    from distutils.core import setup
-from spiflash import __version__ as VERSION
+import codecs
+import os
+import re
+
+from setuptools import find_packages, setup
 
 
-def _read(fname):
-    import os
-    return open(os.path.join(os.path.dirname(__file__), 'spiflash',
-                fname)).read()
+NAME = 'pyspiflash'
+PACKAGES = find_packages(where='.')
+META_PATH = os.path.join('spiflash', '__init__.py')
+KEYWORDS = ['driver','ftdi', 'usb', 'serial', 'spi' ,'flash' ,'mtd']
+CLASSIFIERS=[
+    'Development Status :: 4 - Beta',
+    'Environment :: Other Environment',
+    'Natural Language :: English',
+    'Intended Audience :: Developers',
+    'License :: OSI Approved :: MIT',
+    'Operating System :: MacOS :: MacOS X',
+    'Operating System :: POSIX',
+    'Programming Language :: Python :: 3.5',
+    'Topic :: Software Development :: Libraries :: Python Modules',
+    'Topic :: System :: Hardware :: Hardware Drivers',
+]
+INSTALL_REQUIRES = [
+    'pyftdi >= 0.21.0'
+]
 
-setup(
-    name='pyspiflash',
-    version=VERSION,
-    description='SPI data flash device drivers (pure Python)',
-    author='Emmanuel Blot',
-    author_email='emmanuel.blot@free.fr',
-    license='MIT',
-    keywords='driver ftdi usb serial spi flash mtd',
-    url='http://github.com/eblot/pyspiflash',
-    download_url='https://github.com/eblot/pyspiflash/archive/v%s.tar.gz' %
-                 VERSION,
-    packages=['spiflash'],
-    package_data={'spiflash': ['*.rst']},
-    requires=['pyftdi (>= 0.13.2, < 0.20.0)'],
-    install_requires=['pyftdi>=0.13.2'],
-    classifiers=[
-        'Development Status :: 4 - Beta',
-        'Environment :: Other Environment',
-        'Intended Audience :: Developers',
-        'License :: OSI Approved :: MIT License',
-        'Operating System :: MacOS :: MacOS X',
-        'Operating System :: POSIX',
-        'Programming Language :: Python :: 3.5',
-        'Topic :: Software Development :: Libraries :: Python Modules',
-        'Topic :: System :: Hardware :: Hardware Drivers',
-    ],
-    long_description=_read('README.rst'),
-)
+HERE = os.path.abspath(os.path.dirname(__file__))
+
+
+def read(*parts):
+    """
+    Build an absolute path from *parts* and and return the contents of the
+    resulting file.  Assume UTF-8 encoding.
+    """
+    with codecs.open(os.path.join(HERE, *parts), 'rb', 'utf-8') as f:
+        return f.read()
+
+
+META_FILE = read(META_PATH)
+
+
+def find_meta(meta):
+    """
+    Extract __*meta*__ from META_FILE.
+    """
+    meta_match = re.search(
+        r"^__{meta}__ = ['\"]([^'\"]*)['\"]".format(meta=meta),
+        META_FILE, re.M
+    )
+    if meta_match:
+        return meta_match.group(1)
+    raise RuntimeError("Unable to find __{meta}__ string.".format(meta=meta))
+
+
+if __name__ == '__main__':
+    setup(
+        name=NAME,
+        description=find_meta('description'),
+        license=find_meta('license'),
+        url=find_meta('uri'),
+        version=find_meta('version'),
+        author=find_meta('author'),
+        author_email=find_meta('email'),
+        maintainer=find_meta('author'),
+        maintainer_email=find_meta('email'),
+        keywords=KEYWORDS,
+        long_description=read('README.rst'),
+        packages=PACKAGES,
+        package_dir={'': '.'},
+        package_data={'spiflash': ['*.rst']},
+        classifiers=CLASSIFIERS,
+        install_requires=INSTALL_REQUIRES,
+    )
+
