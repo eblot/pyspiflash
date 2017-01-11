@@ -11,6 +11,7 @@ demonstrate use of SPI devices with PyFtdi_. It could also be useful to dump
 flash contents or recover from a bricked devices.
 
 .. _PySpiFlash : https://github.com/eblot/pyspiflash
+.. _Python: http://python.org/
 .. _PyFtdi : https://github.com/eblot/pyftdi
 
 Supported SPI flash devices
