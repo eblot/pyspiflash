@@ -32,7 +32,7 @@ NAME = 'pyspiflash'
 PACKAGES = find_packages(where='.')
 META_PATH = os.path.join('spiflash', '__init__.py')
 KEYWORDS = ['driver','ftdi', 'usb', 'serial', 'spi' ,'flash' ,'mtd']
-CLASSIFIERS=[
+CLASSIFIERS = [
     'Development Status :: 4 - Beta',
     'Environment :: Other Environment',
     'Natural Language :: English',
@@ -45,7 +45,7 @@ CLASSIFIERS=[
     'Topic :: System :: Hardware :: Hardware Drivers',
 ]
 INSTALL_REQUIRES = [
-    'pyftdi >= 0.21.0'
+    'pyftdi >= 0.22.0'
 ]
 
 HERE = os.path.abspath(os.path.dirname(__file__))
