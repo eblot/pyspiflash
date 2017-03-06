@@ -31,13 +31,13 @@ from setuptools import find_packages, setup
 NAME = 'pyspiflash'
 PACKAGES = find_packages(where='.')
 META_PATH = os.path.join('spiflash', '__init__.py')
-KEYWORDS = ['driver','ftdi', 'usb', 'serial', 'spi' ,'flash' ,'mtd']
+KEYWORDS = ['driver', 'ftdi', 'usb', 'serial', 'spi', 'flash', 'mtd']
 CLASSIFIERS = [
     'Development Status :: 4 - Beta',
     'Environment :: Other Environment',
     'Natural Language :: English',
     'Intended Audience :: Developers',
-    'License :: OSI Approved :: MIT',
+    'License :: OSI Approved :: MIT License',
     'Operating System :: MacOS :: MacOS X',
     'Operating System :: POSIX',
     'Programming Language :: Python :: 3.5',
