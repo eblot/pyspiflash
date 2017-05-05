@@ -94,5 +94,5 @@ if __name__ == '__main__':
         package_data={'spiflash': ['*.rst']},
         classifiers=CLASSIFIERS,
         install_requires=INSTALL_REQUIRES,
+        python_requires='>=3.5',
     )
-
