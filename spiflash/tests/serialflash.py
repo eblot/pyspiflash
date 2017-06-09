@@ -31,6 +31,11 @@ import unittest
 
 
 class SerialFlashTestCase(unittest.TestCase):
+    """Configuration can be changed through environment variables:
+
+       * FTDI_DEVICE: URL to access the FTDI device/interface
+       * SPI_FREQUENCY: SPI bus frequency in Hz
+    """
 
     @classmethod
     def setUpClass(cls):
@@ -39,7 +44,9 @@ class SerialFlashTestCase(unittest.TestCase):
         print('Using FTDI device %s' % cls.ftdi_url)
 
     def setUp(self):
-        self.flash = SerialFlashManager.get_flash_device(self.ftdi_url)
+        freq = float(environ.get('SPI_FREQUENCY', 12E6))
+        self.flash = SerialFlashManager.get_flash_device(self.ftdi_url, 0,
+                                                         freq)
 
     def tearDown(self):
         del self.flash
