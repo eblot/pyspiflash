@@ -882,7 +882,7 @@ class At25FlashDevice(_Gen25FlashDevice):
     """Atmel AT25 flash device implementation"""
 
     JEDEC_ID = 0x1F
-    SIZES = {0x46: 2 << 20, 0x47: 4 << 20, 0x48: 8 << 20}
+    SIZES = {0x46: 2 << 20, 0x47: 4 << 20, 0x48: 8 << 20, 0x84: 7 << 16}
     SPI_FREQ_MAX = 85  # MHz
     TIMINGS = {'page': (0.0015, 0.003),  # 1.5/3 ms
                'subsector': (0.200, 0.200),  # 200/200 ms
@@ -916,10 +916,10 @@ class At25FlashDevice(_Gen25FlashDevice):
     @classmethod
     def match(cls, jedec):
         """Tells whether this class support this JEDEC identifier"""
-        manufacturer, capacity, zero = cls.jedec2int(jedec)
+        manufacturer, capacity, revision = cls.jedec2int(jedec)
         if manufacturer != cls.JEDEC_ID:
             return False
-        if zero:
+        if revision > 1:
             return False
         if capacity not in cls.SIZES:
             return False
