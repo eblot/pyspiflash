@@ -74,6 +74,7 @@ class SerialFlash(object):
     FEAT_SECTERASE = 0x100     # Can erase whole sectors
     FEAT_HSECTERASE = 0x200    # Can erase half sectors
     FEAT_SUBSECTERASE = 0x400  # Can erase sub sectors
+    FEAT_CHIPERASE = 0x800  # Can erase full chip
 
     def set_spi_frequency(self, freq: Optional[float] = None) -> None:
         """Set the SPI bus frequency to communicate with the device. Set
@@ -324,6 +325,8 @@ class _SpiFlashDevice(SerialFlash):
     def can_erase(self, address: int, length: int) -> None:
         """Tells whether a defined area can be erased on the Spansion flash
            device. It does not take into account any locking scheme."""
+        if address == 0 and length == -1:
+            return
         erase_size = self.get_erase_size()
         if address & (erase_size-1):
             # start address should be aligned on a subsector boundary
@@ -335,6 +338,14 @@ class _SpiFlashDevice(SerialFlash):
                                         'erase sector boundary')
         if (address + length) > len(self):
             raise SerialFlashValueError('Would erase over the flash capacity')
+
+    def chip_erase(self) -> None:
+        if self.has_feature(SerialFlash.FEAT_CHIPERASE):
+            self._erase_chip(self.get_erase_command('chip'),
+                             self.get_timings('chip'))
+        else:
+            raise SerialFlashNotSupported('Chip erase is not supported')
+
 
     def get_erase_size(self) -> int:
         """Return the erase size in bytes"""
@@ -884,12 +895,14 @@ class At25FlashDevice(_Gen25FlashDevice):
     JEDEC_ID = 0x1F
     SIZES = {0x46: 2 << 20, 0x47: 4 << 20, 0x48: 8 << 20, 0x84: 7 << 16}
     SPI_FREQ_MAX = 85  # MHz
+    CHIP_DIV = 7 << 16
     TIMINGS = {'page': (0.0015, 0.003),  # 1.5/3 ms
                'subsector': (0.200, 0.200),  # 200/200 ms
                'sector': (0.950, 0.950),  # 950/950 ms
                'bulk': (32, 64),  # seconds
-               'lock': (0.0015, 0.003)}  # 1.5/3 ms
-    FEATURES = SerialFlash.FEAT_SECTERASE | SerialFlash.FEAT_SUBSECTERASE
+               'lock': (0.0015, 0.003),
+               'chip': (4, 11)}  # 1.5/3 ms
+    FEATURES = SerialFlash.FEAT_SECTERASE | SerialFlash.FEAT_SUBSECTERASE | SerialFlash.FEAT_CHIPERASE
 
     CMD_PROTECT_SOFT_WRITE = 0x36
     CMD_PROTECT_LOCK_WRITE = 0x33
@@ -912,6 +925,13 @@ class At25FlashDevice(_Gen25FlashDevice):
         return 'Atmel %s%d %s' % \
             (self._device, len(self) >> 17,
              pretty_size(self._size, lim_m=1 << 20))
+
+    def _erase_chip(self, command: Array, times: Tuple[int, int]):
+        self._enable_write()
+        cmd = Array('B', [command, ])
+        self._spi.exchange(cmd)
+        self._wait_for_completion(times)
+        time.sleep(times[1])
 
     @classmethod
     def match(cls, jedec):
