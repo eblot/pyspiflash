@@ -13,4 +13,5 @@ Contributors:
   * Remove deprecated call to SpiPort from generic 25 SPI flash device
   * Add JEDEC information for low density W25Q & AT45 flash devices
  * Tyler Bell:
-  * Adding type hints
+  * Add type hints
+  * Add erase chip implementation for some flash devices

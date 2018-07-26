@@ -23,7 +23,7 @@ import sys
 import time
 from array import array
 from binascii import hexlify
-from typing import Optional, Tuple, Union
+from typing import Iterable, Optional, Tuple
 
 from pyftdi.misc import pretty_size
 from pyftdi.spi import SpiController, SpiPort
@@ -94,8 +94,7 @@ class SerialFlash(object):
         """
         raise NotImplementedError()
 
-    def write(self, address: int,
-              data: Union[bytes, bytearray, ByteArray]) -> None:
+    def write(self, address: int, data: Iterable[int]) -> None:
         """Write a sequence of bytes, starting at the specified address.
 
            :note: the device cells are not automatically erased, which means
@@ -191,7 +190,7 @@ class SerialFlash(object):
         raise NotImplementedError()
 
     @classmethod
-    def match(cls, jedec: Union[bytes, bytearray, ByteArray]) -> bool:
+    def match(cls, jedec: ByteArray) -> bool:
         """Tells whether this class support this JEDEC identifier.
 
            :param jedec: device type as a sequence of bytes
@@ -445,7 +444,7 @@ class _SpiFlashDevice(SerialFlash):
         if count != length:
             raise SerialFlashError('%d bytes are not erased' % (length-count))
 
-    def _wait_for_completion(self, times: Tuple[int, int]) -> None:
+    def _wait_for_completion(self, times: Tuple[float, float]) -> None:
         typical_time, max_time = times
         timeout = time.time()
         timeout += typical_time+max_time
@@ -463,7 +462,7 @@ class _SpiFlashDevice(SerialFlash):
         raise NotImplementedError()
 
     def _erase_chip(self, command: int, times: Tuple[float, float]) -> None:
-        """Erase the whole chip"""
+        """Erase an entire chip"""
         raise NotImplementedError()
 
 
@@ -545,7 +544,7 @@ class _Gen25FlashDevice(_SpiFlashDevice):
             raise NotImplementedError('No FEATURES defined')
         return bool(features & feature)
 
-    def get_timings(self, timing: str) -> Tuple[int, int]:
+    def get_timings(self, timing: str) -> Tuple[float, float]:
         """Get a time tuple (typical, max)"""
         try:
             # all '25' devices use the same class properties
@@ -555,7 +554,7 @@ class _Gen25FlashDevice(_SpiFlashDevice):
         return timings[timing]
 
     @classmethod
-    def match(cls, jedec: Union[bytes, bytearray, ByteArray]) -> bool:
+    def match(cls, jedec: ByteArray) -> bool:
         """Tells whether this class support this JEDEC identifier"""
         manufacturer, device, capacity = jedec[3:]
         if manufacturer != cls.JEDEC_ID:
@@ -583,8 +582,7 @@ class _Gen25FlashDevice(_SpiFlashDevice):
     def is_busy(self) -> bool:
         return self._is_busy(self._read_status())
 
-    def write(self, address: int,
-              data: Union[bytes, bytearray, ByteArray]) -> None:
+    def write(self, address: int, data: Iterable[int]) -> None:
         """Write a sequence of bytes, starting at the specified address."""
         length = len(data)
         if address+length > len(self):
@@ -632,8 +630,8 @@ class _Gen25FlashDevice(_SpiFlashDevice):
             self._spi.exchange(wcmd)
             self._wait_for_completion(self.get_timings('page'))
 
-    def _erase_blocks(self, command: str, times: Tuple, start: int, end: int,
-                      size: int) -> None:
+    def _erase_blocks(self, command: int, times: Tuple[float, float],
+                      start: int, end: int, size: int) -> None:
         """Erase one or more blocks."""
         while start < end:
             self._enable_write()
@@ -683,8 +681,7 @@ class Sst25FlashDevice(_Gen25FlashDevice):
         return 'SST %s %s' % \
             (self._device, pretty_size(self._size, lim_m=1 << 20))
 
-    def write(self, address: int,
-              data: Union[bytes, bytearray, ByteArray]) -> None:
+    def write(self, address: int, data: Iterable[int]) -> None:
         """SST25 uses a very specific implementation to write data. It offers
            very poor performances, because the device lacks an internal buffer
            which translates into an ultra-heavy load on SPI bus. However, the
@@ -851,8 +848,11 @@ class W25xFlashDevice(_Gen25FlashDevice):
                'subsector': (0.200, 0.200),  # 200/200 ms
                'sector': (1.0, 1.0),  # 1/1 s
                'bulk': (32, 64),  # seconds
-               'lock': (0.05, 0.1)}  # 50/100 ms
-    FEATURES = SerialFlash.FEAT_SECTERASE | SerialFlash.FEAT_SUBSECTERASE
+               'lock': (0.05, 0.1),  # 50/100 ms
+               'chip': (4, 11)}
+    FEATURES = (SerialFlash.FEAT_SECTERASE |
+                SerialFlash.FEAT_SUBSECTERASE |
+                SerialFlash.FEAT_CHIPERASE)
 
     def __init__(self, spi, jedec):
         super(W25xFlashDevice, self).__init__(spi)
@@ -866,6 +866,13 @@ class W25xFlashDevice(_Gen25FlashDevice):
         return 'Winbond %s%d %s' % \
             (self._device, len(self) >> 17,
              pretty_size(self._size, lim_m=1 << 20))
+
+    def _erase_chip(self, command: int, times: Tuple[float, float]):
+        """Erase an entire chip"""
+        self._enable_write()
+        cmd = array('B', [command, ])
+        self._spi.exchange(cmd)
+        self._wait_for_completion(times)
 
 
 class Mx25lFlashDevice(_Gen25FlashDevice):
@@ -983,6 +990,13 @@ class At25FlashDevice(_Gen25FlashDevice):
         return 'Atmel %s%d %s' % \
             (self._device, len(self) >> 17,
              pretty_size(self._size, lim_m=1 << 20))
+
+    def _erase_chip(self, command: int, times: Tuple[float, float]):
+        """Erase an entire chip"""
+        self._enable_write()
+        cmd = array('B', [command, ])
+        self._spi.exchange(cmd)
+        self._wait_for_completion(times)
 
     @classmethod
     def match(cls, jedec):
