@@ -23,7 +23,7 @@ import sys
 import time
 from array import array as Array
 from binascii import hexlify
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Iterable
 
 from pyftdi.misc import pretty_size
 from pyftdi.spi import SpiController, SpiPort
@@ -81,7 +81,7 @@ class SerialFlash(object):
         """Read a sequence of bytes from the specified address."""
         raise NotImplementedError()
 
-    def write(self, address: int, data: int) -> None:
+    def write(self, address: int, data: Iterable[int]) -> None:
         """Write a sequence of bytes, starting at the specified address."""
         raise NotImplementedError()
 
@@ -390,6 +390,10 @@ class _SpiFlashDevice(SerialFlash):
         """Erase one or more blocks"""
         raise NotImplementedError()
 
+    def _erase_chip(self, command: Array, times: Tuple[int, int]):
+        """Erase an entire chip"""
+        raise NotImplementedError()
+
     def get_size(self, kind: str) -> int:
         raise NotImplementedError()
 
@@ -515,7 +519,7 @@ class _Gen25FlashDevice(_SpiFlashDevice):
     def is_busy(self) -> bool:
         return self._is_busy(self._read_status())
 
-    def write(self, address: int, data: Array) -> None:
+    def write(self, address: int, data: Iterable[int]) -> None:
         """Write a sequence of bytes, starting at the specified address."""
         length = len(data)
         if address + length > len(self):
@@ -613,7 +617,7 @@ class Sst25FlashDevice(_Gen25FlashDevice):
         return 'SST %s %s' % \
                (self._device, pretty_size(self._size, lim_m=1 << 20))
 
-    def write(self, address: int, data: Array) -> None:
+    def write(self, address: int, data: Iterable[int]) -> None:
         """SST25 uses a very specific implementation to write data. It offers
            very poor performances, because the device lacks an internal buffer
            which translates into an ultra-heavy load on SPI bus. However, the
@@ -783,8 +787,9 @@ class W25xFlashDevice(_Gen25FlashDevice):
                'subsector': (0.200, 0.200),  # 200/200 ms
                'sector': (1.0, 1.0),  # 1/1 s
                'bulk': (32, 64),  # seconds
-               'lock': (0.05, 0.1)}  # 50/100 ms
-    FEATURES = SerialFlash.FEAT_SECTERASE | SerialFlash.FEAT_SUBSECTERASE
+               'lock': (0.05, 0.1),  # 50/100 ms
+               'chip': (4, 11)}
+    FEATURES = SerialFlash.FEAT_SECTERASE | SerialFlash.FEAT_SUBSECTERASE | SerialFlash.FEAT_CHIPERASE
 
     def __init__(self, spi, jedec):
         super(W25xFlashDevice, self).__init__(spi)
@@ -798,6 +803,13 @@ class W25xFlashDevice(_Gen25FlashDevice):
         return 'Winbond %s%d %s' % \
                (self._device, len(self) >> 17,
                 pretty_size(self._size, lim_m=1 << 20))
+
+    def _erase_chip(self, command: Array, times: Tuple[int, int]):
+        """Erase an entire chip"""
+        self._enable_write()
+        cmd = Array('B', [command, ])
+        self._spi.exchange(cmd)
+        self._wait_for_completion(times)
 
 
 class Mx25lFlashDevice(_Gen25FlashDevice):
@@ -915,11 +927,11 @@ class At25FlashDevice(_Gen25FlashDevice):
                 pretty_size(self._size, lim_m=1 << 20))
 
     def _erase_chip(self, command: Array, times: Tuple[int, int]):
+        """Erase an entire chip"""
         self._enable_write()
         cmd = Array('B', [command, ])
         self._spi.exchange(cmd)
         self._wait_for_completion(times)
-        time.sleep(times[1])
 
     @classmethod
     def match(cls, jedec):
