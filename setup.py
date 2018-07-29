@@ -40,6 +40,7 @@ CLASSIFIERS = [
     'License :: OSI Approved :: MIT License',
     'Operating System :: MacOS :: MacOS X',
     'Operating System :: POSIX',
+    'Operating System :: Microsoft :: Windows',
     'Programming Language :: Python :: 3.5',
     'Topic :: Software Development :: Libraries :: Python Modules',
     'Topic :: System :: Hardware :: Hardware Drivers',
