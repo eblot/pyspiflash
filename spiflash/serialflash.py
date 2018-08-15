@@ -152,7 +152,9 @@ class SerialFlashManager(object):
         """Obtain an instance of the detected flash device"""
         ctrl = SpiController(silent_clock=False)
         ctrl.configure(url)
-        spi = ctrl.get_port(cs, freq)
+        spi = ctrl.get_port(cs)
+        if freq:
+            spi.set_frequency(freq)
         jedec = SerialFlashManager.read_jedec_id(spi)
         if not jedec:
             # it is likely that the latency setting is too low if this
@@ -165,7 +167,11 @@ class SerialFlashManager(object):
     @staticmethod
     def read_jedec_id(spi):
         """Read flash device JEDEC identifier (3 bytes)"""
-        jedec_cmd = Array('B', (SerialFlashManager.CMD_JEDEC_ID,))
+        jedec_cmd = []
+        if not isinstance(SerialFlashManager.CMD_JEDEC_ID, type(Array('B', [0x0]))):
+            jedec_cmd = Array('B', (SerialFlashManager.CMD_JEDEC_ID,))
+        else:
+            jedec_cmd = SerialFlashManager.CMD_JEDEC_ID
         return spi.exchange(jedec_cmd, 3).tobytes()
 
     @staticmethod
@@ -641,6 +647,108 @@ class Sst25FlashDevice(_Gen25FlashDevice):
         while self.is_busy():
             time.sleep(0.01)  # 10 ms
 
+class Sst25VF010AFlashDevice(_Gen25FlashDevice):
+    """SST25VF010A flash device implementation
+    
+       Datasheet: http://ww1.microchip.com/downloads/en/DeviceDoc/25081A.pdf
+    """
+
+    JEDEC_ID = 0xBF
+    DEVICES = {0x49: 'SST25VF010A (1Mbit)'}
+    CMD_PROGRAM_BYTE = 0x02
+    CMD_PROGRAM_WORD = 0xAF  # Auto address increment (for write command)
+    CMD_WRITE_STATUS_REGISTER = 0x01
+    #SST25_AAI = 0b01000000   # AAI mode activation flag
+    SIZES = {0x0: 1 << 20}   # 1Mbit
+    SPI_FREQ_MAX = 33        # MHz
+
+    # ALEX H. TODO: Edit these timings
+    TIMINGS = {'subsector': (0.025, 0.025),  # 25 ms
+               'hsector': (0.025, 0.025),  # 25 ms
+               'sector': (0.025, 0.025),  # 25 ms
+               'lock': (0.0, 0.0)}  # immediate
+    FEATURES = (SerialFlash.FEAT_SECTERASE)
+
+    def __init__(self, spi, jedec = None):
+        super(Sst25VF010AFlashDevice, self).__init__(spi)
+
+        # Dev doesn't support JEDEC ID. Go get mfg and dev ids instead
+        jedec = self.get_mfg_dev_id()
+        
+        if not Sst25VF010AFlashDevice.match(jedec):
+            raise SerialFlashUnknownJedec(jedec[0:3])
+
+        mfg, dev = _SpiFlashDevice.jedec2int(jedec)[0:2]
+        self._device = Sst25VF010AFlashDevice.DEVICES[dev]
+        self._size = Sst25VF010AFlashDevice.SIZES[0] #Sst25VF010AFlashDevice.SIZES[capacity]
+
+    def __str__(self):
+        return 'Microchip %s %s' % \
+            (self._device, pretty_size(self._size, lim_m=1 << 20))
+
+    def get_mfg_dev_id(self):
+        """Does not support JEDEC ID, so we read out manufacturer and device
+           ID values instead. JEDIC ID is 3 bytes, so the first and last bytes
+           are both the manufacturer ID.
+        """
+        mfg_dev_id = self._spi.exchange([0x90, 0x0, 0x0, 0x0], 3).tobytes()
+        #print("Mfg & Dev ID:", hex(int(mfg_dev_id[0])), hex(int(mfg_dev_id[1])))
+        return(mfg_dev_id)
+
+    @classmethod
+    def match(cls, jedec):
+        """Tells whether this class support this JEDEC identifier"""
+        manufacturer, device, manufacturer_again = cls.jedec2int(jedec)
+        if ((manufacturer != cls.JEDEC_ID) and
+            (manufacturer_again != cls.JEDEC_ID)):
+            return False
+        if device not in cls.DEVICES:
+            return False
+        return True
+
+    def write(self, address, data):
+        """SST25 uses a very specific implementation to write data. It offers
+           very poor performances, because the device lacks an internal buffer
+           which translates into an ultra-heavy load on SPI bus. However, the
+           device offers lightning-speed flash erasure.
+           Although the device supports byte-aligned write requests, the
+           current implementation only support half-word write requests."""
+        if address+len(data) > len(self):
+            raise SerialFlashValueError('Cannot fit in flash area')
+        if not isinstance(data, Array):
+            data = Array('B', data)
+        length = len(data)
+        if (address & 0x1) or (length & 0x1) or (length == 0):
+            raise SerialFlashNotSupported("Alignement/size not supported")
+        self._unprotect()
+        self._enable_write()
+        aai_cmd = Array('B', (Sst25VF010AFlashDevice.CMD_PROGRAM_WORD,
+                              (address >> 16) & 0xff,
+                              (address >> 8) & 0xff,
+                              address & 0xff,
+                              data.pop(0), data.pop(0)))
+        offset = 0
+        while True:
+            offset += 2
+            self._spi.exchange(aai_cmd)
+            while self.is_busy():
+                time.sleep(0.01)  # 10 ms
+            if not data:
+                break
+            aai_cmd = Array('B', (Sst25VF010AFlashDevice.CMD_PROGRAM_WORD,
+                                  data.pop(0), data.pop(0)))
+        self._disable_write()
+
+    def _unprotect(self):
+        """Disable default protection for all sectors"""
+        unprotect = Array('B',
+                          (Sst25VF010AFlashDevice.CMD_WRITE_STATUS_REGISTER, 0x00))
+        self._enable_write()
+        self._spi.exchange(unprotect)
+        while self.is_busy():
+            time.sleep(0.01)  # 10 ms
+
+
 
 class S25FlFlashDevice(_Gen25FlashDevice):
     """Spansion S25FL flash device implementation"""
@@ -790,7 +898,7 @@ class Mx25lFlashDevice(_Gen25FlashDevice):
     """Macronix MX25L flash device implementation"""
 
     JEDEC_ID = 0xC2
-    DEVICES = {0x9E: 'MX25D', 0x26: 'MX25E', 0x20: 'MX25E06'}
+    DEVICES = {0x9E: 'MX25D', 0x26: 'MX25E'}
     SIZES = {0x15: 2 << 20, 0x16: 4 << 20, 0x17: 8 << 20, 0x18: 16 << 20}
     SPI_FREQ_MAX = 104  # MHz
     TIMINGS = {'page': (0.0015, 0.003),  # 1.5/3 ms
