@@ -646,9 +646,39 @@ class Sst25FlashDevice(_Gen25FlashDevice):
             time.sleep(0.01)  # 10 ms
 
 class Sst25VF010AFlashDevice(_Gen25FlashDevice):
-    """SST25VF010A flash device implementation
+    """ SST25VF010A flash device implementation
     
-       Datasheet: http://ww1.microchip.com/downloads/en/DeviceDoc/25081A.pdf
+        This device does not support JEDEC ID. This library currently requires
+        the device to support JEDEC ID, so we hack the library slightly when 
+        first attempting to access the device. This class is written so it expects
+        the JEDEC ID value to be <MFG_BYTE><DEV_BYTE><MFG_BYTE>. To get that
+        value, the SerialFlashManager must send the correct command (0x90) and
+        address, instead of the JEDEC ID command.
+
+        Example:
+ 
+        ```
+        flashMan = serialflash.SerialFlashManager
+        flashMan.CMD_JEDEC_ID = Array('B', [0x90, 0x0, 0x0, 0x0])
+        flashDev = flashMan.get_flash_device('ftdi://ftdi:232h/1', cs=0, freq=4E6)
+        print(flashDev)
+        ```
+
+        OR, if you do not use the SerialFlashManager, this device class allows a
+        user to instantiate the device object directly, without providing a JEDEC
+        ID.
+
+        Example:
+
+        ```
+        spiDev = ftdispi.SpiController()
+        spiDev.configure('ftdi://ftdi:232h/1')
+        spiSlavePort = spiDev.get_port(cs=0, freq=4E6, mode=0)
+        flashDev = serialflash.Sst25VF010AFlashDevice(spiSlavePort)
+        print(flashDev)
+        ```
+
+        Datasheet: http://ww1.microchip.com/downloads/en/DeviceDoc/25081A.pdf
     """
 
     JEDEC_ID = 0xBF
