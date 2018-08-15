@@ -152,9 +152,7 @@ class SerialFlashManager(object):
         """Obtain an instance of the detected flash device"""
         ctrl = SpiController(silent_clock=False)
         ctrl.configure(url)
-        spi = ctrl.get_port(cs)
-        if freq:
-            spi.set_frequency(freq)
+        spi = ctrl.get_port(cs, freq)
         jedec = SerialFlashManager.read_jedec_id(spi)
         if not jedec:
             # it is likely that the latency setting is too low if this
@@ -898,7 +896,7 @@ class Mx25lFlashDevice(_Gen25FlashDevice):
     """Macronix MX25L flash device implementation"""
 
     JEDEC_ID = 0xC2
-    DEVICES = {0x9E: 'MX25D', 0x26: 'MX25E'}
+    DEVICES = {0x9E: 'MX25D', 0x26: 'MX25E', 0x20: 'MX25E06'}
     SIZES = {0x15: 2 << 20, 0x16: 4 << 20, 0x17: 8 << 20, 0x18: 16 << 20}
     SPI_FREQ_MAX = 104  # MHz
     TIMINGS = {'page': (0.0015, 0.003),  # 1.5/3 ms
