@@ -68,6 +68,7 @@ class SerialFlash(object):
     FEAT_SECTERASE = 0x100     # Can erase whole sectors
     FEAT_HSECTERASE = 0x200    # Can erase half sectors
     FEAT_SUBSECTERASE = 0x400  # Can erase sub sectors
+    FEAT_CHIPERASE = 0x800     # Can erase entire chip with one command
 
     def set_spi_frequency(self, freq=None):
         """Set the SPI bus frequency to communicate with the device. Set
@@ -252,6 +253,15 @@ class _SpiFlashDevice(SerialFlash):
         rstart = start
         # last page to erase on the right-hand size
         rend = end
+
+        if (self.has_feature(SerialFlash.FEAT_CHIPERASE) and
+            (0 == address) and (len(self) == length)):
+            self.erase_chip(verify=verify)
+            verify=False
+            # Update page addresses to done state. Skips below erase operations.
+            start = end
+            rstart = rend
+
         if self.has_feature(SerialFlash.FEAT_SECTERASE):
             # Check whether one or more whole large sector can be erased
             sector_size = self.get_size('sector')
@@ -343,6 +353,30 @@ class _SpiFlashDevice(SerialFlash):
         raise SerialFlashNotSupported("Unknown erase size")
 
     @classmethod
+    def erase_chip(self, verify=False):
+        """ Erase the entire chip """
+        time_typical, time_max = self.get_timings('erase_chip')
+        cmd_erase_chip = self.get_erase_command('chip')
+        #self._log.warning("Erasing all memory in flash (chip erase operation)!")
+        timeout_sec = 0
+        while self.is_busy():
+            time.sleep(0.010)  # 10 ms
+            timeout_sec += 0.010
+            if (timeout_sec >= time_max):
+                raise SerialFlashTimeout('Chip erase operation could not start. '
+                                         '(is_busy() == True after %f sec)' %
+                                         timeout_sec)
+        self._enable_write()
+        self._spi.exchange(Array('B', (cmd_erase_chip, )))
+        self._wait_for_completion((time_typical, time_max))
+        if self.is_busy():
+            raise SerialFlashTimeout('Chip busy after waiting for max erase time')
+
+        if verify:
+            return self._verify_content(0, len(self), 0xFF)
+        return True
+
+    @classmethod
     def jedec2int(cls, jedec, maxlength=3):
         return tuple(Array('B', jedec[:maxlength]))
 
@@ -363,6 +397,7 @@ class _SpiFlashDevice(SerialFlash):
         count = data.count(refbyte)
         if count != length:
             raise SerialFlashError('%d bytes are not erased' % (length-count))
+        return True
 
     def _wait_for_completion(self, times):
         typical_time, max_time = times
@@ -386,7 +421,7 @@ class _SpiFlashDevice(SerialFlash):
     @classmethod
     def get_erase_command(cls, block):
         """Get the erase command for a specified block kind"""
-        raise NotImplementedError()
+        raise NotImplementedError()        
 
 
 class _Gen25FlashDevice(_SpiFlashDevice):
@@ -645,6 +680,7 @@ class Sst25FlashDevice(_Gen25FlashDevice):
         while self.is_busy():
             time.sleep(0.01)  # 10 ms
 
+
 class Sst25VF010AFlashDevice(_Gen25FlashDevice):
     """ SST25VF010A flash device implementation
     
@@ -682,23 +718,29 @@ class Sst25VF010AFlashDevice(_Gen25FlashDevice):
     """
 
     JEDEC_ID = 0xBF
-    DEVICES = {0x49: 'SST25VF010A (1Mbit)'}
+    DEVICES = {0x49: 'SST25VF010A'}
     CMD_PROGRAM_BYTE = 0x02
-    CMD_PROGRAM_WORD = 0xAF  # Auto address increment (for write command)
+    CMD_PROGRAM_WORD = 0xAF   # Auto address increment (for write command)
+    CMD_ERASE_SECTOR = 0x20   # Clear all bits in 4Kbyte sector to 0xFF
     CMD_WRITE_STATUS_REGISTER = 0x01
-    #SST25_AAI = 0b01000000   # AAI mode activation flag
-    SIZES = {0x0: 1 << 20}   # 1Mbit
-    SPI_FREQ_MAX = 33        # MHz
+    #SST25_AAI = 0b01000000    # AAI mode activation flag
+    SIZES = {0x49: 1 << 20}   # 1Mbit
+    SPI_FREQ_MAX = 33         # MHz
 
     # ALEX H. TODO: Edit these timings
-    TIMINGS = {'subsector': (0.025, 0.025),  # 25 ms
-               'hsector': (0.025, 0.025),  # 25 ms
-               'sector': (0.025, 0.025),  # 25 ms
-               'lock': (0.0, 0.0)}  # immediate
+    TIMINGS = {'sector': (0.025, 0.025),    # 25 ms  (typical & max)
+               'block' : (0.025, 0.025),    # 25 ms  (typical & max)
+               'byte' : (0.00002, 0.00002), # 20 us  (typical & max)
+               'lock': (0.0, 0.0),          # immediate
+               'erase_chip': (0.1, 0.1)}    # 100 ms (typical & max)  
     FEATURES = (SerialFlash.FEAT_SECTERASE)
 
     def __init__(self, spi, jedec = None):
         super(Sst25VF010AFlashDevice, self).__init__(spi)
+        if (self._spi.frequency > (self.SPI_FREQ_MAX * 1E6)):
+            raise SerialFlashNotSupported("SPI port frequency too large")
+
+        print("SPI freq:", self._spi.frequency)
 
         # Dev doesn't support JEDEC ID. Go get mfg and dev ids instead
         jedec = self.get_mfg_dev_id()
@@ -708,16 +750,17 @@ class Sst25VF010AFlashDevice(_Gen25FlashDevice):
 
         mfg, dev = _SpiFlashDevice.jedec2int(jedec)[0:2]
         self._device = Sst25VF010AFlashDevice.DEVICES[dev]
-        self._size = Sst25VF010AFlashDevice.SIZES[0] #Sst25VF010AFlashDevice.SIZES[capacity]
+        self._size = Sst25VF010AFlashDevice.SIZES[dev] #Sst25VF010AFlashDevice.SIZES[capacity]
 
     def __str__(self):
-        return 'Microchip %s %s' % \
-            (self._device, pretty_size(self._size, lim_m=1 << 20))
+        return 'Microchip %s %s (SPI @ %sMHz)' % \
+            (self._device, pretty_size(self._size, lim_m=1 << 20),
+             '{:,.3f}'.format(self._spi.frequency // 1E6))
 
     def get_mfg_dev_id(self):
-        """Does not support JEDEC ID, so we read out manufacturer and device
-           ID values instead. JEDIC ID is 3 bytes, so the first and last bytes
-           are both the manufacturer ID.
+        """ Does not support JEDEC ID, so we read out manufacturer and device
+            ID values instead. JEDIC ID is 3 bytes, so the first and last bytes
+            are both the manufacturer ID.
         """
         mfg_dev_id = self._spi.exchange([0x90, 0x0, 0x0, 0x0], 3).tobytes()
         #print("Mfg & Dev ID:", hex(int(mfg_dev_id[0])), hex(int(mfg_dev_id[1])))
@@ -735,7 +778,7 @@ class Sst25VF010AFlashDevice(_Gen25FlashDevice):
         return True
 
     def write(self, address, data):
-        """SST25 uses a very specific implementation to write data. It offers
+        """SST25VF010A uses a very specific implementation to write data. It offers
            very poor performances, because the device lacks an internal buffer
            which translates into an ultra-heavy load on SPI bus. However, the
            device offers lightning-speed flash erasure.
@@ -753,29 +796,35 @@ class Sst25VF010AFlashDevice(_Gen25FlashDevice):
         aai_cmd = Array('B', (Sst25VF010AFlashDevice.CMD_PROGRAM_WORD,
                               (address >> 16) & 0xff,
                               (address >> 8) & 0xff,
-                              address & 0xff,
-                              data.pop(0), data.pop(0)))
-        offset = 0
+                              address & 0xff, data.pop(0)))
+
+        byte_times = self.get_timings('byte')
         while True:
-            offset += 2
             self._spi.exchange(aai_cmd)
-            while self.is_busy():
-                time.sleep(0.01)  # 10 ms
+            self._wait_for_completion(byte_times)
+            if self.is_busy():
+                time.sleep(0.001)  # 1 ms
+                #self._log.error("Still busy after waiting for <byte_time>")
+                raise SerialFlashTimeout("Still busy after waiting for <byte_time>")
             if not data:
                 break
             aai_cmd = Array('B', (Sst25VF010AFlashDevice.CMD_PROGRAM_WORD,
-                                  data.pop(0), data.pop(0)))
+                            data.pop(0)))
         self._disable_write()
 
     def _unprotect(self):
         """Disable default protection for all sectors"""
-        unprotect = Array('B',
-                          (Sst25VF010AFlashDevice.CMD_WRITE_STATUS_REGISTER, 0x00))
-        self._enable_write()
-        self._spi.exchange(unprotect)
+        en_wr_reg = Array('B', (Sst25VF010AFlashDevice.CMD_EWSR,))
+        unprotect = Array('B', (Sst25VF010AFlashDevice.CMD_WRSR, 0x00))
+
         while self.is_busy():
             time.sleep(0.01)  # 10 ms
 
+        self._enable_write()
+        self._spi.exchange(en_wr_reg)
+        self._spi.exchange(unprotect)
+        while self.is_busy():
+            time.sleep(0.01)  # 10 ms
 
 
 class S25FlFlashDevice(_Gen25FlashDevice):
