@@ -725,7 +725,7 @@ class Sst25VF010AFlashDevice(_Gen25FlashDevice):
     CMD_WRITE_STATUS_REGISTER = 0x01
     #SST25_AAI = 0b01000000    # AAI mode activation flag
     SIZES = {0x49: 1 << 20}   # 1Mbit
-    SECTOR_DIV = 12           # 4Kbit sectors (1 << 12 = 4k)
+    SECTOR_DIV = 12           # 4Kbyte sectors (1 << 12 = 4k)
     SPI_FREQ_MAX = 33         # MHz
 
     TIMINGS = {'sector': (0.025, 0.025),    # 25 ms  (typical & max)
@@ -746,10 +746,8 @@ class Sst25VF010AFlashDevice(_Gen25FlashDevice):
             raise SerialFlashUnknownJedec(jedec[0:3])
 
         mfg, dev = _SpiFlashDevice.jedec2int(jedec)[0:2]
-        # self._device = Sst25VF010AFlashDevice.DEVICES[dev]
-        # self._size = Sst25VF010AFlashDevice.SIZES[dev] #Sst25VF010AFlashDevice.SIZES[capacity]
-        self._device = Sst25VF010AFlashDevice.DEVICES[0x49]
-        self._size = Sst25VF010AFlashDevice.SIZES[0x49]
+        self._device = Sst25VF010AFlashDevice.DEVICES[dev]
+        self._size = Sst25VF010AFlashDevice.SIZES[dev]
 
         self._log = logging.getLogger(type(self).__name__)
 
