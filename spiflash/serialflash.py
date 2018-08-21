@@ -777,12 +777,16 @@ class Sst25VF010AFlashDevice(_Gen25FlashDevice):
         return True
 
     def write(self, address, data, progress=False):
-        """SST25VF010A uses a very specific implementation to write data. It offers
-           very poor performances, because the device lacks an internal buffer
-           which translates into an ultra-heavy load on SPI bus. However, the
-           device offers lightning-speed flash erasure.
-           Although the device supports byte-aligned write requests, the
-           current implementation only support half-word write requests."""
+        """ Write a blob of data to the SPI flash.
+        
+        Args:
+            address:  The starting address to which bytes will be written.
+            data:     The byte array to write.
+            progress: Optionally print the write progress percentage to the screen.
+        
+        Returns:
+            Number of bytes written.
+        """
         if address+len(data) > (len(self)/8):
             raise SerialFlashValueError('Cannot fit in flash area (end addr %d > '
                                         'max addr %d)' %
@@ -791,8 +795,8 @@ class Sst25VF010AFlashDevice(_Gen25FlashDevice):
         if not isinstance(data, Array):
             data = Array('B', data)
         length = len(data)
-        if (address & 0x1) or (length & 0x1) or (length == 0):
-            raise SerialFlashNotSupported('Alignement/size not supported')
+        if (length == 0):
+            raise SerialFlashNotSupported('Alignment/size not supported')
         self._unprotect()
         self._enable_write()
         byte_index = 0
@@ -802,6 +806,8 @@ class Sst25VF010AFlashDevice(_Gen25FlashDevice):
                               address & 0xff, data[byte_index]))
 
         byte_times = self.get_timings('byte')
+        self._wait_for_completion(byte_times)
+        
         while True:
             self._spi.exchange(aai_cmd)
             byte_index += 1
@@ -820,6 +826,11 @@ class Sst25VF010AFlashDevice(_Gen25FlashDevice):
         return byte_index
 
     def chip_test(self):
+        """ Simple write/read test of the SPI flash chip.
+        
+        Returns:
+            True if all tests passed.
+        """
         result = False
         self._log.debug('CHIP TEST: Start')
             
@@ -842,8 +853,7 @@ class Sst25VF010AFlashDevice(_Gen25FlashDevice):
         self._log.debug('CHIP TEST: Erasing entire chip')
         if not self.erase_chip(verify=True):
             self._log.error('CHIP TEST: Erase chip failed')
-            result = False
-            return result
+            return False
 
         # Write entire chip with random data
         max_bytes = int(len(self) / 8)
