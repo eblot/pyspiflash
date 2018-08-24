@@ -744,7 +744,14 @@ class Sst25vfxxxaFlashDevice(_Gen25FlashDevice):
         super(Sst25vfxxxaFlashDevice, self).__init__(spi)
         if (self._spi.frequency > (Sst25vfxxxaFlashDevice.SPI_FREQ_MAX * 1E6)):
             raise SerialFlashNotSupported("SPI port frequency too large")
+
+        # If a write operation was canceled, say with Ctrl+C at command line,
+        # device can become unresponsive (reading mfg & prod IDs returns 0xFF).
+        # Before attempting to read the chip IDs, send a write-disable command
+        # to complete any outstanding operations.
         self._disable_write()
+        self._wait_for_completion(self.get_timings('sector'))
+
         # Dev doesn't support JEDEC ID. Go get mfg and dev ids instead
         jedec = self.get_mfg_dev_id()
         if not Sst25vfxxxaFlashDevice.match(jedec):
@@ -753,8 +760,7 @@ class Sst25vfxxxaFlashDevice(_Gen25FlashDevice):
         mfg, dev = _SpiFlashDevice.jedec2int(jedec)[0:2]
         self._device = Sst25vfxxxaFlashDevice.DEVICES[dev]
         self._size = Sst25vfxxxaFlashDevice.SIZES[dev]
-
-        self._log = logging.getLogger(type(self).__name__)
+        self._log = logging.getLogger(__name__ + '.' + self._device)
 
     def __str__(self):
         return 'Microchip %s %s (SPI @ %sMHz)' % \
