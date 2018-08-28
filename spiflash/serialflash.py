@@ -256,8 +256,10 @@ class _SpiFlashDevice(SerialFlash):
         # last page to erase on the right-hand size
         rend = end
 
+        # If device supports chip erase and desired erase size is the entire
+        # size of the chip, do chip erase.
         if (self.has_feature(SerialFlash.FEAT_CHIPERASE) and
-            (0 == address) and (len(self) == length)):
+            (0 == address) and (self._size == (length*8))):
             self.erase_chip(verify=verify)
             verify=False
         else:
