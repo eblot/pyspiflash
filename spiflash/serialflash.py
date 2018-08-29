@@ -726,21 +726,26 @@ class Sst25vfxxxaFlashDevice(_Gen25FlashDevice):
     JEDEC_ID = 0xBF
     DEVICES = {0x48: 'SST25VF512A', 0x49: 'SST25VF010A'}
     CMD_PROGRAM_BYTE = 0x02
-    CMD_PROGRAM_WORD = 0xAF   # Auto address increment (for write command)
-    CMD_ERASE_SECTOR = 0x20   # Clear all bits in 4Kbyte sector to 0xFF
+    CMD_PROGRAM_WORD = 0xAF     # Auto address increment (for write command)
+    CMD_ERASE_SECTOR = 0xD8     # Erase 32Kbyte block
+    CMD_ERASE_SUBSECTOR = 0x20  # Erase 4Kbyte sector
     CMD_WRITE_STATUS_REGISTER = 0x01
-    SIZES = {0x48: 1 << 19,   # 512Kbit 
-             0x49: 1 << 20}   # 1Mbit
-    SECTOR_DIV = 12           # 4Kbyte sectors (1 << 12 = 4k)
-    SPI_FREQ_MAX = 20         # MHz
+    CMD_READ_MFG_ID = Array('B', [0x90, 0x0, 0x0, 0x0])
+    CMD_READ_DEV_ID = Array('B', [0x90, 0x0, 0x0, 0x1])
+    SIZES = {0x48: 1 << 16,     # 512Kbit (65536 bytes)
+             0x49: 1 << 17}     # 1Mbit (131072 bytes)
+    SECTOR_DIV = 15             # 32Kbyte blocks (1 << 15 = 32k)
+    SUBSECTOR_DIV = 12          # 4Kbyte sectors (1 << 12 = 4k)
+    SPI_FREQ_MAX = 20           # MHz
 
-    TIMINGS = {'sector': (0.025, 0.026),    # 25 ms  (typical & max)
-               'block' : (0.025, 0.026),    # 25 ms  (typical & max)
+    TIMINGS = {'subsector': (0.025, 0.026), # Sector erase 25 ms  (typical & max)
+               'sector' : (0.025, 0.026),   # Block erase 25 ms  (typical & max)
                'byte' : (0.00002, 0.02),    # 20 us  (typical & max)
                'lock': (0.0, 0.0),          # immediate
                'erase_chip': (0.1, 0.1)}    # 100 ms (typical & max) 
 
-    FEATURES = (SerialFlash.FEAT_SECTERASE | SerialFlash.FEAT_CHIPERASE)
+    FEATURES = (SerialFlash.FEAT_SUBSECTERASE | SerialFlash.FEAT_SECTERASE
+                | SerialFlash.FEAT_CHIPERASE)
 
     def __init__(self, spi, jedec = None):
         super(Sst25vfxxxaFlashDevice, self).__init__(spi)
@@ -765,9 +770,8 @@ class Sst25vfxxxaFlashDevice(_Gen25FlashDevice):
         self._log = logging.getLogger(__name__ + '.' + self._device)
 
     def __str__(self):
-        return 'Microchip %s %s (SPI @ %sMHz)' % \
-            (self._device, pretty_size(self._size, lim_m=1 << 20),
-             '{:,.3f}'.format(self._spi.frequency // 1E6))
+        return 'Microchip %s %s' % \
+            (self._device, pretty_size(self._size, lim_m=1 << 20))
 
     def get_mfg_dev_id(self):
         """ Read and return manufacture and device ID.
@@ -779,7 +783,7 @@ class Sst25vfxxxaFlashDevice(_Gen25FlashDevice):
             Returns:
                 [<MFG_BYTE>, <DEV_BYTE>, <MFG_BYTE>]
         """
-        mfg_dev_id = self._spi.exchange([0x90, 0x0, 0x0, 0x0], 3).tobytes()
+        mfg_dev_id = self._spi.exchange(self.CMD_READ_MFG_ID, 3).tobytes()
         #mfg_dev_id = [0xBF, 0x49, 0xBF]
         return(mfg_dev_id)
 
@@ -806,11 +810,11 @@ class Sst25vfxxxaFlashDevice(_Gen25FlashDevice):
             Returns:
                 Number of bytes written.
         """
-        if address+len(data) > (len(self)/8):
+        if address+len(data) > self._size:
             raise SerialFlashValueError('Cannot fit in flash area (end addr %d > '
                                         'max addr %d)' %
                                         (address+len(data),
-                                        int(len(self)/8)))
+                                        int(self._size)))
         if not isinstance(data, Array):
             data = Array('B', data)
         length = len(data)
@@ -852,18 +856,18 @@ class Sst25vfxxxaFlashDevice(_Gen25FlashDevice):
         """
         result = False
         self._log.debug('CHIP TEST: Start')
-            
-        er_size = self.get_erase_size()
+        
+        er_size = self.get_size('sector')
         self._unprotect()
         self._enable_write()
-        for i in range(0, int((len(self)/8)/er_size)):
-            self._log.debug('CHIP TEST: Erasing sector %d (%d bytes)', i, er_size)
+        for i in range(0, int(self._size/er_size)):
+            self._log.debug('CHIP TEST: Erasing block %d (%d bytes)', i, er_size)
             self.erase(i*er_size, er_size, verify=True)
 
         # Write a few bytes at the beginning and the end, so we know the chip
         # erase (next) succeded.
         self.write(0, Array('B', (0xA5,0xA6)), progress=False)
-        self.write(int(len(self)/8)-16, Array('B', (0xA5,0xA6)), progress=False)
+        self.write(self._size-16, Array('B', (0xA5,0xA6)), progress=False)
 
         # Erase entire chip
         self._log.debug('CHIP TEST: Erasing entire chip')
@@ -872,7 +876,7 @@ class Sst25vfxxxaFlashDevice(_Gen25FlashDevice):
             return False
 
         # Write entire chip with random data
-        max_bytes = int(len(self) / 8)
+        max_bytes = self._size
         self._log.debug('CHIP TEST: Generating %d random bytes to write', max_bytes)
         dat_rand_write = bytearray(random.getrandbits(8) for _ in range(max_bytes))
         dat_rand_write = Array('B', dat_rand_write)
