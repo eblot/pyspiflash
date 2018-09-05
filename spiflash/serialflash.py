@@ -21,8 +21,6 @@
 
 import sys
 import time
-import logging
-import random
 from array import array as Array
 from binascii import hexlify
 from pyftdi.spi import SpiController
@@ -767,7 +765,6 @@ class Sst25vfxxxaFlashDevice(_Gen25FlashDevice):
         mfg, dev = _SpiFlashDevice.jedec2int(jedec)[0:2]
         self._device = Sst25vfxxxaFlashDevice.DEVICES[dev]
         self._size = Sst25vfxxxaFlashDevice.SIZES[dev]
-        self._log = logging.getLogger(__name__ + '.' + self._device)
 
     def __str__(self):
         return 'Microchip %s %s' % \
@@ -798,7 +795,7 @@ class Sst25vfxxxaFlashDevice(_Gen25FlashDevice):
             return False
         return True
 
-    def write(self, address, data, progress=False):
+    def write(self, address, data):
         """ Write a blob of data to the SPI flash.
         
             Args:
@@ -834,72 +831,13 @@ class Sst25vfxxxaFlashDevice(_Gen25FlashDevice):
         while True:
             self._spi.exchange(aai_cmd)
             byte_index += 1
-            if progress:
-                sys.stdout.write('\r')
-                sys.stdout.write('%d%% ' % (int((byte_index/length) * 100)))
-                sys.stdout.flush()
             self._wait_for_completion(byte_times)
             if byte_index >= length:
-                if progress:
-                    sys.stdout.write('\r')
                 break
             aai_cmd = Array('B', (Sst25vfxxxaFlashDevice.CMD_PROGRAM_WORD,
                             data[byte_index]))
         self._disable_write()
         return byte_index
-
-    def chip_test(self):
-        """ Simple write/read test of the SPI flash chip.
-            
-            Returns:
-                True if all tests passed.
-        """
-        result = False
-        self._log.debug('CHIP TEST: Start')
-        
-        er_size = self.get_size('sector')
-        self._unprotect()
-        self._enable_write()
-        for i in range(0, int(self._size/er_size)):
-            self._log.debug('CHIP TEST: Erasing block %d (%d bytes)', i, er_size)
-            self.erase(i*er_size, er_size, verify=True)
-
-        # Write a few bytes at the beginning and the end, so we know the chip
-        # erase (next) succeded.
-        self.write(0, Array('B', (0xA5,0xA6)), progress=False)
-        self.write(self._size-16, Array('B', (0xA5,0xA6)), progress=False)
-
-        # Erase entire chip
-        self._log.debug('CHIP TEST: Erasing entire chip')
-        if not self.erase_chip(verify=True):
-            self._log.error('CHIP TEST: Erase chip failed')
-            return False
-
-        # Write entire chip with random data
-        max_bytes = self._size
-        self._log.debug('CHIP TEST: Generating %d random bytes to write', max_bytes)
-        dat_rand_write = bytearray(random.getrandbits(8) for _ in range(max_bytes))
-        dat_rand_write = Array('B', dat_rand_write)
-        self._log.debug('CHIP TEST: Writing random test data')
-        bytes_written = 0
-        bytes_written = self.write(0, dat_rand_write, progress=True)
-        if (bytes_written != len(dat_rand_write)):
-            self._log.error('CHIP TEST: Only %d of %d bytes were written!', bytes_written, len(dat_rand_write))
-        else:
-            self._log.debug('CHIP TEST: %d of %d bytes written', bytes_written, len(dat_rand_write))
-
-        # Readback and verify
-        self._log.debug('CHIP TEST: Verifying data was written correctly')
-        dat_readback = self.read(0, len(dat_rand_write))
-        if dat_readback == dat_rand_write:
-            self._log.debug('CHIP TEST: Random data write/read passed')
-            result = True
-        else:
-            self._log.error('CHIP TEST: Random data write/read FAILED')
-            result = False
-
-        self._log.debug('CHIP TEST: End (passed: %s)', str(result))
-        return result
 
     def _unprotect(self):
         """Disable default protection for all sectors"""
