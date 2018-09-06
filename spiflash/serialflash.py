@@ -134,7 +134,7 @@ class SerialFlash(object):
         raise NotImplementedError()
 
     @classmethod
-    def match(cls, jedec):
+    def match(cls, flash_id):
         """Tells whether this class support this JEDEC identifier"""
         raise NotImplementedError()
 
@@ -148,33 +148,33 @@ class SerialFlashManager(object):
 
     CMD_JEDEC_ID = 0x9F
 
-    @staticmethod
-    def get_flash_device(url, cs=0, freq=None):
+    @classmethod
+    def get_flash_device(cls, url, cs=0, freq=None):
         """Obtain an instance of the detected flash device"""
-        ctrl = SpiController(silent_clock=False)
-        ctrl.configure(url)
-        spi = ctrl.get_port(cs, freq)
-        jedec = SerialFlashManager.read_jedec_id(spi)
+        spi = cls._get_spi_slave(url, cs, freq)
+        jedec = cls.read_jedec_id(spi)
         if not jedec:
             # it is likely that the latency setting is too low if this
             # condition is encountered
             raise SerialFlashUnknownJedec("Unable to read JEDEC Id")
-        flash = SerialFlashManager._get_flash(spi, jedec)
+        flash = cls._get_flash(spi, jedec)
         flash.set_spi_frequency(freq)
         return flash
 
-    @staticmethod
-    def read_jedec_id(spi):
+    @classmethod
+    def read_jedec_id(cls, spi):
         """Read flash device JEDEC identifier (3 bytes)"""
-        jedec_cmd = []
-        if not isinstance(SerialFlashManager.CMD_JEDEC_ID, type(Array('B', [0x0]))):
-            jedec_cmd = Array('B', (SerialFlashManager.CMD_JEDEC_ID,))
-        else:
-            jedec_cmd = SerialFlashManager.CMD_JEDEC_ID
+        jedec_cmd = Array('B', (cls.CMD_JEDEC_ID,))
         return spi.exchange(jedec_cmd, 3).tobytes()
 
-    @staticmethod
-    def _get_flash(spi, jedec):
+    @classmethod
+    def _get_spi_slave(cls, url, cs, freq):
+        ctrl = SpiController(silent_clock=False)
+        ctrl.configure(url)
+        return ctrl.get_port(cs, freq)
+
+    @classmethod
+    def _get_flash(cls, spi, jedec):
         devices = []
         contents = sys.modules[__name__].__dict__
         for name in contents:
@@ -187,6 +187,65 @@ class SerialFlashManager(object):
             raise SerialFlashUnknownJedec(jedec)
         else:
             raise SerialFlashError('No serial flash detected')
+
+
+class SerialFlashManagerNoJedec(SerialFlashManager):
+    """Serial flash manager.
+
+       Some flash device do not comply with JEDEC standard.
+       This alternate factory should be used with such devices.
+    """
+
+    @classmethod
+    def get_flash_device(cls, url, cs=0, freq=None, devfilter=None):
+        """Obtain an instance of the detected flash device"""
+        spi = cls._get_spi_slave(url, cs, freq)
+        devices = cls.get_nojedec_devices()
+        if devfilter:
+            devices = {name: dev for name, dev in devices.items()
+                       if name in devfilter}
+        for device in devices.values():
+            flash = None
+            try:
+                fid = device.get_device_id(spi)
+                if not fid:
+                    continue
+                flash = cls._get_flash(spi, fid)
+                break
+            except SerialFlashError:
+                continue
+        else:
+            raise SerialFlashUnknownJedec("Unable to detect flash device")
+        flash.set_spi_frequency(freq)
+        return flash
+
+    @classmethod
+    def read_jedec_id(cls, spi):
+        """Read flash device JEDEC identifier (3 bytes)"""
+        raise SerialFlashUnknownJedec('JEDEC ID not supported')
+
+    @staticmethod
+    def get_nojedec_devices():
+        devices = {}
+        contents = sys.modules[__name__].__dict__
+        for name in contents:
+            if name.endswith('FlashDevice') and not name.startswith('_'):
+                device = contents[name]
+                # No-JEDEC compliant flash device should support a
+                # get_device_id classmethod which takes a single argument,
+                # a SPI port. This method should either raises a
+                # SerialFlashError exception or return None if the flash
+                # cannot succcesfully be identified.
+                try:
+                    method = getattr(device, 'get_device_id')
+                    if not callable(method):
+                        continue
+                    if method.__self__ is not device:  # is classmethod
+                        continue
+                except AttributeError:
+                    continue
+                devices[name[:-len('FlashDevice')]] = device
+        return devices
 
 
 class _SpiFlashDevice(SerialFlash):
@@ -257,72 +316,73 @@ class _SpiFlashDevice(SerialFlash):
         # If device supports chip erase and desired erase size is the entire
         # size of the chip, do chip erase.
         if (self.has_feature(SerialFlash.FEAT_CHIPERASE) and
-            (0 == address) and (self._size == (length*8))):
+                address == 0 and len(self) == (length*8)):
             self.erase_chip(verify=verify)
-            verify=False
-        else:
-            if self.has_feature(SerialFlash.FEAT_SECTERASE):
-                # Check whether one or more whole large sector can be erased
-                sector_size = self.get_size('sector')
-                sector_mask = ~(sector_size-1)
-                s_start = (start+sector_size-1) & sector_mask
-                s_end = end & sector_mask
-                if s_start < s_end:
-                    self._erase_blocks(self.get_erase_command('sector'),
-                                    self.get_timings('sector'),
-                                    s_start, s_end, sector_size)
-                    # update the left-hand end marker
-                    end = s_start
-                    # update the right-hand start marker
-                    if s_end > rstart:
-                        rstart = s_end
-            if self.has_feature(SerialFlash.FEAT_HSECTERASE):
-                # Check whether one or more left halfsectors can be erased
-                hsector_size = self.get_size('hsector')
-                hsector_mask = ~(hsector_size-1)
-                hsl_start = (start+sector_size-1) & sector_mask
-                hsl_end = end & sector_mask
-                if hsl_start < hsl_end:
-                    self._erase_blocks(self.get_erase_command('hsector'),
-                                    self.get_timings('hsector'),
-                                    hsl_start, hsl_end, hsector_size)
-                    # update the left-hand end marker
-                    end = hsl_start
-                    # update the right-hand start marker
-                    if hsl_end > rstart:
-                        rstart = hsl_end
-            if self.has_feature(SerialFlash.FEAT_SUBSECTERASE):
-                # Check whether one or more left subsectors can be erased
-                subsector_size = self.get_size('subsector')
-                subsector_mask = ~(subsector_size-1)
-                ssl_start = (start+subsector_size-1) & subsector_mask
-                ssl_end = end & subsector_mask
-                if ssl_start < ssl_end:
-                    self._erase_blocks(self.get_erase_command('subsector'),
-                                    self.get_timings('subsector'),
-                                    ssl_start, ssl_end, subsector_size)
-                    # update the right-hand start marker
-                    if ssl_end > rstart:
-                        rstart = ssl_end
-            if self.has_feature(SerialFlash.FEAT_HSECTERASE):
-                # Check whether one or more whole left halfsectors can be erased
-                hsr_start = (rstart+hsector_size-1) & hsector_mask
-                hsr_end = rend & hsector_mask
-                if hsr_start < hsr_end:
-                    self._erase_blocks(self.get_erase_command('hsector'),
-                                    self.get_timings('hsector'),
-                                    hsr_start, hsr_end, hsector_size)
-                    # update the right-hand start marker
-                    if hsr_end > rstart:
-                        rstart = hsr_end
-            if self.has_feature(SerialFlash.FEAT_SUBSECTERASE):
-                # Check whether one or more whole right subsectors can be erased
-                ssr_start = (rstart+subsector_size-1) & subsector_mask
-                ssr_end = rend & subsector_mask
-                if ssr_start < ssr_end:
-                    self._erase_blocks(self.get_erase_command('subsector'),
-                                    self.get_timings('subsector'),
-                                    ssr_start, ssr_end, subsector_size)
+            if verify:
+                self._verify_content(address, length, 0xFF)
+            return
+        if self.has_feature(SerialFlash.FEAT_SECTERASE):
+            # Check whether one or more whole large sector can be erased
+            sector_size = self.get_size('sector')
+            sector_mask = ~(sector_size-1)
+            s_start = (start+sector_size-1) & sector_mask
+            s_end = end & sector_mask
+            if s_start < s_end:
+                self._erase_blocks(self.get_erase_command('sector'),
+                                   self.get_timings('sector'),
+                                   s_start, s_end, sector_size)
+                # update the left-hand end marker
+                end = s_start
+                # update the right-hand start marker
+                if s_end > rstart:
+                    rstart = s_end
+        if self.has_feature(SerialFlash.FEAT_HSECTERASE):
+            # Check whether one or more left halfsectors can be erased
+            hsector_size = self.get_size('hsector')
+            hsector_mask = ~(hsector_size-1)
+            hsl_start = (start+sector_size-1) & sector_mask
+            hsl_end = end & sector_mask
+            if hsl_start < hsl_end:
+                self._erase_blocks(self.get_erase_command('hsector'),
+                                   self.get_timings('hsector'),
+                                   hsl_start, hsl_end, hsector_size)
+                # update the left-hand end marker
+                end = hsl_start
+                # update the right-hand start marker
+                if hsl_end > rstart:
+                    rstart = hsl_end
+        if self.has_feature(SerialFlash.FEAT_SUBSECTERASE):
+            # Check whether one or more left subsectors can be erased
+            subsector_size = self.get_size('subsector')
+            subsector_mask = ~(subsector_size-1)
+            ssl_start = (start+subsector_size-1) & subsector_mask
+            ssl_end = end & subsector_mask
+            if ssl_start < ssl_end:
+                self._erase_blocks(self.get_erase_command('subsector'),
+                                   self.get_timings('subsector'),
+                                   ssl_start, ssl_end, subsector_size)
+                # update the right-hand start marker
+                if ssl_end > rstart:
+                    rstart = ssl_end
+        if self.has_feature(SerialFlash.FEAT_HSECTERASE):
+            # Check whether one or more whole left halfsectors can be erased
+            hsr_start = (rstart+hsector_size-1) & hsector_mask
+            hsr_end = rend & hsector_mask
+            if hsr_start < hsr_end:
+                self._erase_blocks(self.get_erase_command('hsector'),
+                                   self.get_timings('hsector'),
+                                   hsr_start, hsr_end, hsector_size)
+                # update the right-hand start marker
+                if hsr_end > rstart:
+                    rstart = hsr_end
+        if self.has_feature(SerialFlash.FEAT_SUBSECTERASE):
+            # Check whether one or more whole right subsectors can be erased
+            ssr_start = (rstart+subsector_size-1) & subsector_mask
+            ssr_end = rend & subsector_mask
+            if ssr_start < ssr_end:
+                self._erase_blocks(self.get_erase_command('subsector'),
+                                   self.get_timings('subsector'),
+                                   ssr_start, ssr_end, subsector_size)
         if verify:
             self._verify_content(address, length, 0xFF)
 
@@ -362,15 +422,14 @@ class _SpiFlashDevice(SerialFlash):
         time_typical = chip_erase_timings[0]
         time_max = chip_erase_timings[1]
         cmd_erase_chip = self.get_erase_command('chip')
-        #self._log.warning("Erasing all memory in flash (chip erase operation)!")
         timeout_sec = 0
         while self.is_busy():
             time.sleep(0.010)  # 10 ms
             timeout_sec += 0.010
-            if (timeout_sec >= time_max):
-                raise SerialFlashTimeout('Chip erase operation could not start. '
-                                         '(is_busy() == True after %f sec)' %
-                                         timeout_sec)
+            if timeout_sec >= time_max:
+                raise SerialFlashTimeout(
+                    'Chip erase operation could not start,'
+                    'still busy after %f sec)' % timeout_sec)
         self._enable_write()
         self._spi.exchange(Array('B', (cmd_erase_chip, )))
         self._wait_for_completion((time_typical, time_max))
@@ -426,7 +485,7 @@ class _SpiFlashDevice(SerialFlash):
     @classmethod
     def get_erase_command(cls, block):
         """Get the erase command for a specified block kind"""
-        raise NotImplementedError()        
+        raise NotImplementedError()
 
 
 class _Gen25FlashDevice(_SpiFlashDevice):
@@ -517,9 +576,9 @@ class _Gen25FlashDevice(_SpiFlashDevice):
         return timings[time_]
 
     @classmethod
-    def match(cls, jedec):
-        """Tells whether this class support this JEDEC identifier"""
-        manufacturer, device, capacity = cls.jedec2int(jedec)
+    def match(cls, flash_id):
+        """Tells whether this class support this device identifier"""
+        manufacturer, device, capacity = cls.jedec2int(flash_id)
         if manufacturer != cls.JEDEC_ID:
             return False
         if device not in cls.DEVICES:
@@ -686,42 +745,43 @@ class Sst25FlashDevice(_Gen25FlashDevice):
             time.sleep(0.01)  # 10 ms
 
 
-class Sst25vfxxxaFlashDevice(_Gen25FlashDevice):
-    """ SST25VFxxxA flash device implementation
-    
-        This device does not support JEDEC ID. This library currently requires
-        the device to support JEDEC ID, so we hack the library slightly when
-        first attempting to access the device. This class is written so it
-        expects the JEDEC ID value to be <MFG_BYTE><DEV_BYTE><MFG_BYTE>. To get
-        that value, the SerialFlashManager must send the correct command (0x90)
-        and address, instead of the JEDEC ID command. Override the
-        SerialFlashManager's JEDEC ID request command as shown below.
+class Sst25VfaFlashDevice(_Gen25FlashDevice):
+    """SST25VFxxxA flash device implementation
 
-        Example:
-        ```
-        flashMan = serialflash.SerialFlashManager
-        flashMan.CMD_JEDEC_ID = Array('B', [0x90, 0x0, 0x0, 0x0])
-        flashDev = flashMan.get_flash_device('ftdi://ftdi:232h/1', cs=0, freq=4E6)
-        print(flashDev)
-        ```
+       This device does not support JEDEC ID. This library currently requires
+       the device to support JEDEC ID, so we hack the library slightly when
+       first attempting to access the device. This class is written so it
+       expects the JEDEC ID value to be <MFG_BYTE><DEV_BYTE><MFG_BYTE>. To get
+       that value, the SerialFlashManager must send the correct command (0x90)
+       and address, instead of the JEDEC ID command. Override the
+       SerialFlashManager's JEDEC ID request command as shown below.
 
-        OR, if you do not use the SerialFlashManager, this device class allows a
-        user to instantiate the device object directly, without providing a
-        JEDEC ID.
+       Example:
+       ```
+       flashMan = serialflash.SerialFlashManager
+       flashMan.CMD_JEDEC_ID = Array('B', [0x90, 0x0, 0x0, 0x0])
+       flashDev = flashMan.get_flash_device('ftdi://ftdi:232h/1', cs=0,
+                                            freq=4E6)
+       print(flashDev)
+       ```
 
-        Example:
-        ```
-        spiDev = ftdispi.SpiController()
-        spiDev.configure('ftdi://ftdi:232h/1')
-        spiSlavePort = spiDev.get_port(cs=0, freq=4E6, mode=0)
-        flashDev = serialflash.Sst25vfxxxaFlashDevice(spiSlavePort)
-        print(flashDev)
-        ```
+       OR, if you do not use the SerialFlashManager, this device class allows
+       a user to instantiate the device object directly, without providing a
+       JEDEC ID.
 
-        Datasheet: http://ww1.microchip.com/downloads/en/DeviceDoc/25081A.pdf
+       Example:
+       ```
+       spiDev = ftdispi.SpiController()
+       spiDev.configure('ftdi://ftdi:232h/1')
+       spiSlavePort = spiDev.get_port(cs=0, freq=4E6, mode=0)
+       flashDev = serialflash.Sst25vfxxxaFlashDevice(spiSlavePort)
+       print(flashDev)
+       ```
+
+       Datasheet: http://ww1.microchip.com/downloads/en/DeviceDoc/25081A.pdf
     """
 
-    JEDEC_ID = 0xBF
+    MANUFACTURER_ID = 0xBF
     DEVICES = {0x48: 'SST25VF512A', 0x49: 'SST25VF010A'}
     CMD_PROGRAM_BYTE = 0x02
     CMD_PROGRAM_WORD = 0xAF     # Auto address increment (for write command)
@@ -736,19 +796,19 @@ class Sst25vfxxxaFlashDevice(_Gen25FlashDevice):
     SUBSECTOR_DIV = 12          # 4Kbyte sectors (1 << 12 = 4k)
     SPI_FREQ_MAX = 20           # MHz
 
-    TIMINGS = {'subsector': (0.025, 0.026), # Sector erase 25 ms  (typical & max)
-               'sector' : (0.025, 0.026),   # Block erase 25 ms  (typical & max)
-               'byte' : (0.00002, 0.02),    # 20 us  (typical & max)
-               'lock': (0.0, 0.0),          # immediate
-               'erase_chip': (0.1, 0.1)}    # 100 ms (typical & max) 
+    TIMINGS = {'subsector': (0.025, 0.026),  # Sector erase 25 ms (typ. & max)
+               'sector': (0.025, 0.026),     # Block erase 25 ms (typ. & max)
+               'byte': (0.00002, 0.02),      # 20 us  (typical & max)
+               'lock': (0.0, 0.0),           # immediate
+               'erase_chip': (0.1, 0.1)}     # 100 ms (typical & max)
 
     FEATURES = (SerialFlash.FEAT_SUBSECTERASE | SerialFlash.FEAT_SECTERASE
                 | SerialFlash.FEAT_CHIPERASE)
 
-    def __init__(self, spi, jedec = None):
-        super(Sst25vfxxxaFlashDevice, self).__init__(spi)
-        if (self._spi.frequency > (Sst25vfxxxaFlashDevice.SPI_FREQ_MAX * 1E6)):
-            raise SerialFlashNotSupported("SPI port frequency too large")
+    def __init__(self, spi, jedec=None):
+        super(Sst25VfaFlashDevice, self).__init__(spi)
+        if self._spi.frequency > (Sst25VfaFlashDevice.SPI_FREQ_MAX * 1E6):
+            raise SerialFlashNotSupported("SPI bus frequency too large")
 
         # If a write operation was canceled, say with Ctrl+C at command line,
         # device can become unresponsive (reading mfg & prod IDs returns 0xFF).
@@ -758,21 +818,22 @@ class Sst25vfxxxaFlashDevice(_Gen25FlashDevice):
         self._wait_for_completion(self.get_timings('sector'))
 
         # Dev doesn't support JEDEC ID. Go get mfg and dev ids instead
-        jedec = self.get_mfg_dev_id()
-        if not Sst25vfxxxaFlashDevice.match(jedec):
-            raise SerialFlashUnknownJedec(jedec[0:3])
-
-        mfg, dev = _SpiFlashDevice.jedec2int(jedec)[0:2]
-        self._device = Sst25vfxxxaFlashDevice.DEVICES[dev]
-        self._size = Sst25vfxxxaFlashDevice.SIZES[dev]
+        flash_id = self.get_device_id()
+        if not Sst25VfaFlashDevice.match(flash_id):
+            raise SerialFlashNotSupported('Not a %s device',
+                                          self.__class__.__name__)
+        dev = flash_id[1]
+        self._device = Sst25VfaFlashDevice.DEVICES[dev]
+        self._size = Sst25VfaFlashDevice.SIZES[dev]
 
     def __str__(self):
         return 'Microchip %s %s' % \
             (self._device, pretty_size(self._size, lim_m=1 << 20))
 
-    def get_mfg_dev_id(self):
+    @classmethod
+    def get_device_id(cls, spi):
         """ Read and return manufacture and device ID.
-        
+
             Does not support JEDEC ID, so we read out manufacturer and device
             ID values instead. JEDIC ID is 3 bytes, so the first and last bytes
             are both the manufacturer ID.
@@ -780,69 +841,67 @@ class Sst25vfxxxaFlashDevice(_Gen25FlashDevice):
             Returns:
                 [<MFG_BYTE>, <DEV_BYTE>, <MFG_BYTE>]
         """
-        mfg_dev_id = self._spi.exchange(self.CMD_READ_MFG_ID, 3).tobytes()
-        #mfg_dev_id = [0xBF, 0x49, 0xBF]
-        return(mfg_dev_id)
+        mfg_dev_id = spi.exchange(cls.CMD_READ_MFG_ID, 3).tobytes()
+        return mfg_dev_id
 
     @classmethod
-    def match(cls, jedec):
-        """Tells whether this class supports a given JEDEC identifier"""
-        manufacturer, device, manufacturer_again = cls.jedec2int(jedec)
-        if ((manufacturer != cls.JEDEC_ID) and
-            (manufacturer_again != cls.JEDEC_ID)):
+    def match(cls, flash_id):
+        """Tells whether this class support this flash_id identifier"""
+        try:
+            manuf1, device, manuf2 = flash_id[0], flash_id[1], flash_id[2]
+        except IndexError:
+            return False
+        if manuf1 != cls.MANUFACTURER_ID or manuf2 != manuf1:
             return False
         if device not in cls.DEVICES:
+            return False
+        if device not in cls.SIZES:
             return False
         return True
 
     def write(self, address, data):
         """ Write a blob of data to the SPI flash.
-        
-            Args:
-                address:  The starting address to which bytes will be written.
-                data:     The byte array to write.
-                progress: Optionally print the write progress percentage to the
-                    screen.
-            
-            Returns:
-                Number of bytes written.
+
+            :param address: The starting address to which bytes will be
+                            written.
+            :param data:    The byte array to write.
+            :return:        Number of bytes written.
         """
         if address+len(data) > self._size:
-            raise SerialFlashValueError('Cannot fit in flash area (end addr %d > '
-                                        'max addr %d)' %
-                                        (address+len(data),
-                                        int(self._size)))
+            raise SerialFlashValueError(
+                'Cannot fit in flash area (end addr %d > max addr %d)' %
+                (address+len(data), int(self._size)))
         if not isinstance(data, Array):
             data = Array('B', data)
         length = len(data)
-        if (length == 0):
+        if length == 0:
             raise SerialFlashNotSupported('Alignment/size not supported')
         self._unprotect()
         self._enable_write()
         byte_index = 0
-        aai_cmd = Array('B', (Sst25vfxxxaFlashDevice.CMD_PROGRAM_WORD,
+        aai_cmd = Array('B', (Sst25VfaFlashDevice.CMD_PROGRAM_WORD,
                               (address >> 16) & 0xff,
                               (address >> 8) & 0xff,
                               address & 0xff, data[byte_index]))
 
         byte_times = self.get_timings('byte')
         self._wait_for_completion(byte_times)
-        
+
         while True:
             self._spi.exchange(aai_cmd)
             byte_index += 1
             self._wait_for_completion(byte_times)
             if byte_index >= length:
                 break
-            aai_cmd = Array('B', (Sst25vfxxxaFlashDevice.CMD_PROGRAM_WORD,
-                            data[byte_index]))
+            aai_cmd = Array('B', (Sst25VfaFlashDevice.CMD_PROGRAM_WORD,
+                                  data[byte_index]))
         self._disable_write()
         return byte_index
 
     def _unprotect(self):
         """Disable default protection for all sectors"""
-        en_wr_reg = Array('B', (Sst25vfxxxaFlashDevice.CMD_EWSR,))
-        unprotect = Array('B', (Sst25vfxxxaFlashDevice.CMD_WRSR, 0x00))
+        en_wr_reg = Array('B', (Sst25VfaFlashDevice.CMD_EWSR,))
+        unprotect = Array('B', (Sst25VfaFlashDevice.CMD_WRSR, 0x00))
 
         self._wait_for_completion(self.get_timings('sector'))
         self._enable_write()
