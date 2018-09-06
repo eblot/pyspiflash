@@ -23,8 +23,10 @@ import sys
 import time
 from array import array as Array
 from binascii import hexlify
-from pyftdi.spi import SpiController
+from typing import Optional, Tuple
+
 from pyftdi.misc import pretty_size
+from pyftdi.spi import SpiController, SpiPort
 
 
 class SerialFlashError(Exception):
@@ -69,71 +71,71 @@ class SerialFlash(object):
     FEAT_HSECTERASE = 0x200    # Can erase half sectors
     FEAT_SUBSECTERASE = 0x400  # Can erase sub sectors
 
-    def set_spi_frequency(self, freq=None):
+    def set_spi_frequency(self, freq: Optional[int] = None) -> None:
         """Set the SPI bus frequency to communicate with the device. Set
            default SPI frequency if none is provided."""
         raise NotImplementedError()
 
-    def read(self, address, length):
+    def read(self, address: int, length: int) -> bytes:
         """Read a sequence of bytes from the specified address."""
         raise NotImplementedError()
 
-    def write(self, address, data):
+    def write(self, address: int, data: int) -> None:
         """Write a sequence of bytes, starting at the specified address."""
         raise NotImplementedError()
 
-    def erase(self, address, length):
+    def erase(self, address: int, length: int) -> None:
         """Erase a block of bytes. Address and length depends upon device-
            specific constraints."""
         raise NotImplementedError()
 
-    def can_erase(self, address, length):
+    def can_erase(self, address: int, length: int) -> None:
         """Tells whether a defined area can be erased on the Spansion flash
            device. It does not take into account any locking scheme."""
         raise NotImplementedError()
 
-    def is_busy(self):
+    def is_busy(self) -> bool:
         """Reports whether the flash may receive commands or is actually
            being performing internal work"""
         raise NotImplementedError()
 
-    def get_capacity(self):
+    def get_capacity(self) -> int:
         """Get the flash device capacity in bytes"""
         raise NotImplementedError()
 
-    def get_capabilities(self):
+    def get_capabilities(self) -> int:
         """Flash device capabilities."""
         return SerialFlash.FEAT_NONE
 
-    def get_locks(self):
+    def get_locks(self):  # TODO: unknown return type
         """Report the currently write-protected areas of the device."""
         raise NotImplementedError()
 
-    def set_lock(self, address, length, otp=False):
+    def set_lock(self, address: int, length: int, otp=False) -> None:
         """Create a write-protected area. Device should have been unlocked
            first."""
         raise NotImplementedError()
 
-    def unlock(self):
+    def unlock(self) -> None:
         """Make the whole device read/write"""
         raise NotImplementedError()
 
     @property
-    def unique_id(self):
+    def unique_id(self) -> int:
         """Return the unique ID of the flash, if it exists"""
         raise NotImplementedError()
 
-    def get_timings(self, time_):
+    def get_timings(self, time: str) -> Tuple[int, int]:
         """Get a time tuple (typical, max)"""
         raise NotImplementedError()
 
     @classmethod
-    def has_feature(cls, feature):
+    def has_feature(cls, feature: int) -> bool:
         """Flash device capabilities."""
         raise NotImplementedError()
 
     @classmethod
-    def match(cls, jedec):
+    def match(cls, jedec: Array) -> bool:
         """Tells whether this class support this JEDEC identifier"""
         raise NotImplementedError()
 
@@ -148,7 +150,7 @@ class SerialFlashManager(object):
     CMD_JEDEC_ID = 0x9F
 
     @staticmethod
-    def get_flash_device(url, cs=0, freq=None):
+    def get_flash_device(url: str, cs: int = 0, freq: Optional[int] = None) -> '_SpiFlashDevice':
         """Obtain an instance of the detected flash device"""
         ctrl = SpiController(silent_clock=False)
         ctrl.configure(url)
@@ -163,13 +165,13 @@ class SerialFlashManager(object):
         return flash
 
     @staticmethod
-    def read_jedec_id(spi):
+    def read_jedec_id(spi: SpiPort) -> bytes:
         """Read flash device JEDEC identifier (3 bytes)"""
         jedec_cmd = Array('B', (SerialFlashManager.CMD_JEDEC_ID,))
         return spi.exchange(jedec_cmd, 3).tobytes()
 
     @staticmethod
-    def _get_flash(spi, jedec):
+    def _get_flash(spi: SpiPort, jedec: bytes) -> '_SpiFlashDevice':
         devices = []
         contents = sys.modules[__name__].__dict__
         for name in contents:
@@ -200,14 +202,14 @@ class _SpiFlashDevice(SerialFlash):
     CMD_READ_HI_SPEED = 0x0B  # Read @ high speed
     ADDRESS_WIDTH = 3
 
-    def __init__(self, spiport):
+    def __init__(self, spiport: SpiPort):
         self._spi = spiport
 
     @property
-    def spi_frequency(self):
+    def spi_frequency(self) -> int:
         return self._spi and self._spi.frequency
 
-    def read(self, address, length):
+    def read(self, address: int, length: int) -> Array:
         if address+length > len(self):
             raise SerialFlashValueError('Out of range')
         buf = Array('B')
@@ -219,7 +221,7 @@ class _SpiFlashDevice(SerialFlash):
             buf.extend(data)
         return buf
 
-    def erase(self, address, length, verify=False):
+    def erase(self, address: int, length: int, verify: bool = False) -> None:
         """Erase sectors/blocks/chip of a "generic" flash device.
            Erasure algorithm:
            The area to erase span across one or more sectors, which can be
@@ -313,7 +315,7 @@ class _SpiFlashDevice(SerialFlash):
         if verify:
             self._verify_content(address, length, 0xFF)
 
-    def can_erase(self, address, length):
+    def can_erase(self, address: int, length: int) -> None:
         """Tells whether a defined area can be erased on the Spansion flash
            device. It does not take into account any locking scheme."""
         erase_size = self.get_erase_size()
@@ -328,7 +330,7 @@ class _SpiFlashDevice(SerialFlash):
         if (address + length) > len(self):
             raise SerialFlashValueError('Would erase over the flash capacity')
 
-    def get_erase_size(self):
+    def get_erase_size(self) -> int:
         """Return the erase size in bytes"""
         if self.has_feature(SerialFlash.FEAT_SUBSECTERASE):
             return self.get_size('subsector')
@@ -339,28 +341,28 @@ class _SpiFlashDevice(SerialFlash):
         raise SerialFlashNotSupported("Unknown erase size")
 
     @classmethod
-    def jedec2int(cls, jedec, maxlength=3):
+    def jedec2int(cls, jedec, maxlength=3) -> Tuple[chr, ...]:
         return tuple(Array('B', jedec[:maxlength]))
 
-    def _read_lo_speed(self, address, length):
+    def _read_lo_speed(self, address: int, length: int) -> Array:
         read_cmd = Array('B', (self.CMD_READ_LO_SPEED,
                                (address >> 16) & 0xff, (address >> 8) & 0xff,
                                address & 0xff))
         return self._spi.exchange(read_cmd, length)
 
-    def _read_hi_speed(self, address, length):
+    def _read_hi_speed(self, address: int, length: int) -> Array:
         read_cmd = Array('B', (self.CMD_READ_HI_SPEED,
                                (address >> 16) & 0xff, (address >> 8) & 0xff,
                                address & 0xff, 0))
         return self._spi.exchange(read_cmd, length)
 
-    def _verify_content(self, address, length, refbyte):
+    def _verify_content(self, address: int, length: int, refbyte: int) -> None:
         data = self.read(address, length)
         count = data.count(refbyte)
         if count != length:
             raise SerialFlashError('%d bytes are not erased' % (length-count))
 
-    def _wait_for_completion(self, times):
+    def _wait_for_completion(self, times: Tuple[int, int]) -> None:
         typical_time, max_time = times
         timeout = time.time()
         timeout += typical_time+max_time
@@ -372,15 +374,15 @@ class _SpiFlashDevice(SerialFlash):
             time.sleep(typical_time)
             cycle += 1
 
-    def _erase_blocks(self, command, times, start, end, size):
+    def _erase_blocks(self, command: Array, times: Tuple[int, int], start: int, end: int, size: int) -> None:
         """Erase one or more blocks"""
         raise NotImplementedError()
 
-    def get_size(self, kind):
+    def get_size(self, kind: str) -> int:
         raise NotImplementedError()
 
     @classmethod
-    def get_erase_command(cls, block):
+    def get_erase_command(cls, block: str)-> Array:
         """Get the erase command for a specified block kind"""
         raise NotImplementedError()
 
@@ -428,14 +430,14 @@ class _Gen25FlashDevice(_SpiFlashDevice):
     CMD_ERASE_SECTOR = 0xD8
     CMD_ERASE_CHIP = 0xC7
 
-    def __init__(self, spi):
+    def __init__(self, spi: SpiPort):
         super(_Gen25FlashDevice, self).__init__(spi)
         self._size = 0
 
     def __len__(self):
         return self._size
 
-    def set_spi_frequency(self, freq=None):
+    def set_spi_frequency(self, freq: Optional[int] = None) -> None:
         default_freq = self.SPI_FREQ_MAX*1E06
         freq = freq and min(default_freq, freq) or default_freq
         self._spi.set_frequency(freq)
@@ -449,12 +451,12 @@ class _Gen25FlashDevice(_SpiFlashDevice):
                                           kind.title())
 
     @classmethod
-    def get_erase_command(cls, block):
+    def get_erase_command(cls, block: str) -> str:
         """Get the erase command for a specified block kind"""
         return getattr(cls, 'CMD_ERASE_%s' % block.upper())
 
     @classmethod
-    def has_feature(cls, feature):
+    def has_feature(cls, feature: int) -> bool:
         """Flash device feature"""
         try:
             # all '25' devices use the same class properties
@@ -463,7 +465,7 @@ class _Gen25FlashDevice(_SpiFlashDevice):
             raise NotImplementedError('No FEATURES defined')
         return bool(features & feature)
 
-    def get_timings(self, time_):
+    def get_timings(self, time_: str) -> Tuple[int, int]:
         """Get a time tuple (typical, max)"""
         try:
             # all '25' devices use the same class properties
@@ -473,7 +475,7 @@ class _Gen25FlashDevice(_SpiFlashDevice):
         return timings[time_]
 
     @classmethod
-    def match(cls, jedec):
+    def match(cls, jedec: bytes) -> bool:
         """Tells whether this class support this JEDEC identifier"""
         manufacturer, device, capacity = cls.jedec2int(jedec)
         if manufacturer != cls.JEDEC_ID:
@@ -484,7 +486,7 @@ class _Gen25FlashDevice(_SpiFlashDevice):
             return False
         return True
 
-    def unlock(self):
+    def unlock(self) -> None:
         self._enable_write()
         wrsr_cmd = Array('B', (_Gen25FlashDevice.CMD_WRSR,
                                _Gen25FlashDevice.SR_WEL |
@@ -498,10 +500,10 @@ class _Gen25FlashDevice(_SpiFlashDevice):
         if status & _Gen25FlashDevice.SR_PROTECT_ALL:
             raise SerialFlashRequestError("Cannot unprotect flash device")
 
-    def is_busy(self):
+    def is_busy(self) -> bool:
         return self._is_busy(self._read_status())
 
-    def write(self, address, data):
+    def write(self, address: int, data: Array) -> None:
         """Write a sequence of bytes, starting at the specified address."""
         length = len(data)
         if address+length > len(self):
@@ -516,22 +518,22 @@ class _Gen25FlashDevice(_SpiFlashDevice):
             address += size
             pos += size
 
-    def _read_status(self):
+    def _read_status(self) -> int:
         read_cmd = Array('B', (self.CMD_READ_STATUS,))
         data = self._spi.exchange(read_cmd, 1)
         if len(data) != 1:
             raise SerialFlashTimeout("Unable to retrieve flash status")
         return data[0]
 
-    def _enable_write(self):
+    def _enable_write(self) -> None:
         wren_cmd = Array('B', (self.CMD_WRITE_ENABLE,))
         self._spi.exchange(wren_cmd)
 
-    def _disable_write(self):
+    def _disable_write(self) -> None:
         wrdi_cmd = Array('B', (self.CMD_WRITE_DISABLE,))
         self._spi.exchange(wrdi_cmd)
 
-    def _write(self, address, data):
+    def _write(self, address: int, data: Array) -> None:
         # take care not to roll over the end of the flash page
         page_mask = self.get_size('page')-1
         if address & page_mask:
@@ -549,7 +551,7 @@ class _Gen25FlashDevice(_SpiFlashDevice):
             self._spi.exchange(wcmd)
             self._wait_for_completion(self.get_timings('page'))
 
-    def _erase_blocks(self, command, times, start, end, size):
+    def _erase_blocks(self, command: str, times: Tuple, start: int, end: int, size: int) -> None:
         """Erase one or more blocks"""
         while start < end:
             self._enable_write()
@@ -560,11 +562,11 @@ class _Gen25FlashDevice(_SpiFlashDevice):
             start += size
 
     @classmethod
-    def _is_busy(cls, status):
+    def _is_busy(cls, status: int) -> bool:
         return bool(status & cls.SR_WIP)
 
     @classmethod
-    def _is_wren(cls, status):
+    def _is_wren(cls, status: int) -> bool:
         return bool(status & cls.SR_WEL)
 
 
@@ -599,7 +601,7 @@ class Sst25FlashDevice(_Gen25FlashDevice):
         return 'SST %s %s' % \
             (self._device, pretty_size(self._size, lim_m=1 << 20))
 
-    def write(self, address, data):
+    def write(self, address: int, data: Array) -> None:
         """SST25 uses a very specific implementation to write data. It offers
            very poor performances, because the device lacks an internal buffer
            which translates into an ultra-heavy load on SPI bus. However, the
@@ -676,7 +678,7 @@ class S25FlFlashDevice(_Gen25FlashDevice):
         return 'Spansion %s %s' % \
             (self._device, pretty_size(self._size, lim_m=1 << 20))
 
-    def can_erase(self, address, length):
+    def can_erase(self, address: int, length: int):
         """Verifies that a defined area can be erased on the Spansion flash
            device. It does not take into account any locking scheme.
         """
@@ -1121,7 +1123,7 @@ class At45FlashDevice(_SpiFlashDevice):
     def _is_busy(cls, status):
         return not bool(status & cls.SR_READY)
 
-    def write(self, address, data):
+    def write(self, address: int, data: Array) -> None:
         """Write a sequence of bytes, starting at the specified address."""
         length = len(data)
         if address+length > len(self):
