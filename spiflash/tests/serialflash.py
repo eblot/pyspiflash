@@ -26,8 +26,13 @@ from os import environ
 from random import randint, seed
 from struct import pack as spack
 from time import time as now
+from pyftdi.ftdi import Ftdi
 from pyftdi.misc import hexdump, pretty_size
+from pyftdi.spi import SpiController
+from pyftdi.usbtools import UsbTools
 from spiflash.serialflash import SerialFlashManager
+
+#pylint: disable-msg=invalid-name
 
 
 class SerialFlashTestCase(unittest.TestCase):
@@ -41,12 +46,11 @@ class SerialFlashTestCase(unittest.TestCase):
     def setUpClass(cls):
         # FTDI device should be defined to your actual setup
         cls.ftdi_url = environ.get('FTDI_DEVICE', 'ftdi://ftdi:2232/1')
+        cls.frequency = float(environ.get('SPI_FREQUENCY', 12E6))
         print('Using FTDI device %s' % cls.ftdi_url)
 
     def setUp(self):
-        freq = float(environ.get('SPI_FREQUENCY', 12E6))
-        self.flash = SerialFlashManager.get_flash_device(self.ftdi_url, 0,
-                                                         freq)
+        self.flash = None
 
     def tearDown(self):
         del self.flash
@@ -54,12 +58,16 @@ class SerialFlashTestCase(unittest.TestCase):
     def test_flashdevice_1_name(self):
         """Retrieve device name
         """
+        self.flash = SerialFlashManager.get_flash_device(self.ftdi_url, 0,
+                                                         self.frequency)
         print("Flash device: %s @ SPI freq %0.1f MHz" %
               (self.flash, self.flash.spi_frequency/1E6))
 
     def test_flashdevice_2_read_bandwidth(self):
         """Read the whole device to get READ bandwith
         """
+        self.flash = SerialFlashManager.get_flash_device(self.ftdi_url, 0,
+                                                         self.frequency)
         delta = now()
         data = self.flash.read(0, len(self.flash))
         delta = now()-delta
@@ -69,6 +77,8 @@ class SerialFlashTestCase(unittest.TestCase):
     def test_flashdevice_3_small_rw(self):
         """Short R/W test
         """
+        self.flash = SerialFlashManager.get_flash_device(self.ftdi_url, 0,
+                                                         self.frequency)
         self.flash.unlock()
         self.flash.erase(0x007000, 4096)
         data = self.flash.read(0x007020, 128)
@@ -95,6 +105,8 @@ class SerialFlashTestCase(unittest.TestCase):
         # limit the test to 1MiB to keep the test duration short, but performs
         # test at the end of the flash to verify that high addresses may be
         # reached
+        self.flash = SerialFlashManager.get_flash_device(self.ftdi_url, 0,
+                                                         self.frequency)
         length = min(len(self.flash), size)
         start = len(self.flash)-length
         print("Erase %s from flash @ 0x%06x (may take a while...)" %
@@ -125,7 +137,7 @@ class SerialFlashTestCase(unittest.TestCase):
         delta = now()
         self.flash.write(start, buf)
         delta = now()-delta
-        length = len(bufstr)
+        length = len(buf)
         self._report_bw('Wrote', length, delta)
         wmd = sha1()
         wmd.update(buf)
@@ -139,7 +151,7 @@ class SerialFlashTestCase(unittest.TestCase):
         # print hexdump(back.tobytes())
         print("Verify flash")
         rmd = sha1()
-        rmd.update(data.tobytes())
+        rmd.update(back)
         newdigest = rmd.hexdigest()
         print("Reference:", refdigest)
         print("Retrieved:", newdigest)
@@ -154,6 +166,24 @@ class SerialFlashTestCase(unittest.TestCase):
                     if errcount >= 32:
                         break
             raise self.fail('Data comparison mismatch')
+
+    def test_usb_device(self):
+        """Demo instanciation from an existing UsbDevice.
+        """
+        candidate = Ftdi.get_identifiers(self.ftdi_url)
+        usbdev = UsbTools.get_device(candidate[0])
+        spi = SpiController(cs_count=1)
+        spi.configure(usbdev, interface=candidate[1])
+        flash = SerialFlashManager.get_from_controller(spi, cs=0,
+                                                       freq=self.frequency)
+
+    def test_spi_controller(self):
+        """Demo instanciation with an SpiController.
+        """
+        spi = SpiController(cs_count=1)
+        spi.configure(self.ftdi_url)
+        flash = SerialFlashManager.get_from_controller(spi, cs=0,
+                                                       freq=self.frequency)
 
     @classmethod
     def _report_bw(cls, action, length, time_):
