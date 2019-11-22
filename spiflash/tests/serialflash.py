@@ -33,6 +33,7 @@ from pyftdi.usbtools import UsbTools
 from spiflash.serialflash import SerialFlashManager
 
 #pylint: disable-msg=invalid-name
+#pylint: disable-msg=too-many-locals
 
 
 class SerialFlashTestCase(unittest.TestCase):
