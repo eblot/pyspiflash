@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2011-2016, Emmanuel Blot <emmanuel.blot@free.fr>
+# Copyright (c) 2011-2019, Emmanuel Blot <emmanuel.blot@free.fr>
 # All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,14 +20,14 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from array import array as Array
+import unittest
 from hashlib import sha1
 from os import environ
+from random import randint, seed
+from struct import pack as spack
+from time import time as now
 from pyftdi.misc import hexdump, pretty_size
 from spiflash.serialflash import SerialFlashManager
-from random import randint, seed
-from time import time as now
-import unittest
 
 
 class SerialFlashTestCase(unittest.TestCase):
@@ -72,10 +72,10 @@ class SerialFlashTestCase(unittest.TestCase):
         self.flash.unlock()
         self.flash.erase(0x007000, 4096)
         data = self.flash.read(0x007020, 128)
-        ref = Array('B', [0xff] * 128)
+        ref = bytes([0xff] * 128)
         self.assertEqual(data, ref)
-        string = 'This is a serial SPI flash test.' * 3
-        ref2 = Array('B', string.encode('ascii'))
+        test = 'This is a serial SPI flash test.' * 3
+        ref2 = bytearray(test.encode('ascii'))
         self.flash.write(0x007020, ref2)
         data = self.flash.read(0x007020, 128)
         ref2.extend(ref)
@@ -111,40 +111,32 @@ class SerialFlashTestCase(unittest.TestCase):
             length = 16 << 10
         print("Build test sequence")
         if not randomize:
-            buf = Array('I')
-            back = Array('I')
+            buf = bytearray()
             for address in range(0, length, 4):
-                buf.append(address)
+                buf.extend(spack('>I', address))
             # Expect to run on x86 or ARM (little endian), so swap the values
             # to ease debugging
-            # A cleaner test would verify the host endianess, or use struct
-            # module
-            buf.byteswap()
-            # Cannot use buf directly, as it's an I-array,
-            # and SPI expects a B-array
         else:
             seed(0)
-            buf = Array('B')
-            back = Array('B')
+            buf = bytearray()
             buf.extend((randint(0, 255) for _ in range(0, length)))
-        bufstr = buf.tobytes()
         print("Writing %s to flash (may take a while...)" %
-              pretty_size(len(bufstr)))
+              pretty_size(len(buf)))
         delta = now()
-        self.flash.write(start, bufstr)
+        self.flash.write(start, buf)
         delta = now()-delta
         length = len(bufstr)
         self._report_bw('Wrote', length, delta)
         wmd = sha1()
-        wmd.update(buf.tobytes())
+        wmd.update(buf)
         refdigest = wmd.hexdigest()
         print("Reading %s from flash" % pretty_size(length))
         delta = now()
-        data = self.flash.read(start, length)
+        back = self.flash.read(start, length)
         delta = now()-delta
         self._report_bw('Read', length, delta)
         # print "Dump flash"
-        # print hexdump(data.tobytes())
+        # print hexdump(back.tobytes())
         print("Verify flash")
         rmd = sha1()
         rmd.update(data.tobytes())
@@ -153,9 +145,8 @@ class SerialFlashTestCase(unittest.TestCase):
         print("Retrieved:", newdigest)
         if refdigest != newdigest:
             errcount = 0
-            back.fromstring(data)
             for pos in range(len(buf)):
-                if buf[pos] != data[pos]:
+                if buf[pos] != back[pos]:
                     print('Invalid byte @ offset 0x%06x: 0x%02x / 0x%02x' %
                           (pos, buf[pos], back[pos]))
                     errcount += 1
