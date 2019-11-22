@@ -92,7 +92,7 @@ Dependencies
 ------------
 
 * Python_ 3.5 or above is required.
-* PyFTDI_ 0.20 or above is required.
+* PyFTDI_ 0.42 or above is required.
 
 Note about previous releases
 ............................
@@ -115,4 +115,5 @@ PySpiFlash_ version  PyFtdi_ version
 0.3.*                0.11+
 0.4.*                0.13.2+
 0.5.*                0.20.0+
+0.6.*                0.42.0+
 ==================== ===============
