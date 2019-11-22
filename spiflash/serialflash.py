@@ -208,9 +208,37 @@ class SerialFlashManager:
     CMD_JEDEC_ID = 0x9F
 
     @staticmethod
+    def get_from_controller(spictrl: SpiController,
+                            cs: int = 0, freq: Optional[float] = None) \
+            -> '_SpiFlashDevice':
+        """Obtain an instance of the detected flash device, using an
+           existing SpiController.
+
+           :param spictrl: a PyFtdi configured SpiController instance
+           :param cs: the /CS line to use from the controller
+           :param freq: the SPI bus frequency for this flash device
+           :return: new instance of the flash device, if detected
+        """
+        spi = spictrl.get_port(cs, freq)
+        jedec = SerialFlashManager.read_jedec_id(spi)
+        if not jedec:
+            # it is likely that the latency setting is too low if this
+            # condition is encountered
+            raise SerialFlashUnknownJedec("Unable to read JEDEC Id")
+        flash = SerialFlashManager._get_flash(spi, jedec)
+        flash.set_spi_frequency(freq)
+        return flash
+
+    @staticmethod
     def get_flash_device(url: str, cs: int = 0, freq: Optional[float] = None) \
             -> '_SpiFlashDevice':
-        """Obtain an instance of the detected flash device"""
+        """Obtain an instance of the detected flash device.
+
+           :param url: PyFtdi controller or a PyUSB UsbDevice
+           :param cs: the /CS line to use from the controller
+           :param freq: the SPI bus frequency for this flash device
+           :return: new instance of the flash device, if detected
+        """
         ctrl = SpiController(cs_count=cs+1)
         ctrl.configure(url)
         spi = ctrl.get_port(cs, freq)
@@ -227,7 +255,7 @@ class SerialFlashManager:
     def read_jedec_id(spi: SpiPort) -> bytes:
         """Read flash device JEDEC identifier (3 bytes)"""
         jedec_cmd = bytes((SerialFlashManager.CMD_JEDEC_ID,))
-        return spi.exchange(jedec_cmd, 3).tobytes()
+        return spi.exchange(jedec_cmd, 3)
 
     @staticmethod
     def _get_flash(spi: SpiPort, jedec: bytes) -> '_SpiFlashDevice':
@@ -560,7 +588,7 @@ class _Gen25FlashDevice(_SpiFlashDevice):
     @classmethod
     def match(cls, jedec: Union[bytes, bytearray, Iterable[int]]) -> bool:
         """Tells whether this class support this JEDEC identifier"""
-        manufacturer, device, capacity = jedec[3:]
+        manufacturer, device, capacity = jedec[:3]
         if manufacturer != cls.JEDEC_ID:
             return False
         if device not in cls.DEVICES:
