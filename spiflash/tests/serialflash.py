@@ -74,120 +74,121 @@ class SerialFlashTestCase(unittest.TestCase):
         delta = now()-delta
         length = len(data)
         self._report_bw('Read', length, delta)
-        f = open('spiDataP5.bin','wb')
+        f = open('spiData.bin','wb')             #Dumping data to file
         f.write(data)
         print("Data read length: %d", length)
         f.close()
-    # def test_flashdevice_3_small_rw(self):
-    #     """Short R/W test
-    #     """
-    #     self.flash = SerialFlashManager.get_flash_device(self.ftdi_url, 0,
-    #                                                      self.frequency)
-    #     self.flash.unlock()
-    #     self.flash.erase(0x007000, 4096)
-    #     data = self.flash.read(0x007020, 128)
-    #     ref = bytes([0xff] * 128)
-    #     self.assertEqual(data, ref)
-    #     test = 'This is a serial SPI flash test.' * 3
-    #     ref2 = bytearray(test.encode('ascii'))
-    #     self.flash.write(0x007020, ref2)
-    #     data = self.flash.read(0x007020, 128)
-    #     ref2.extend(ref)
-    #     ref2 = ref2[:128]
-    #     self.assertEqual(data, ref2)
 
-    # def test_flashdevice_4_long_rw(self):
-    #     """Long R/W test
-    #     """
-    #     # Max size to perform the test on
-    #     size = 1 << 20
-    #     # Whether to test with random value, or contiguous values to ease debug
-    #     randomize = True
-    #     # Fill in the whole flash with a monotonic increasing value, that is
-    #     # the current flash 32-bit address, then verify the sequence has been
-    #     # properly read back
-    #     # limit the test to 1MiB to keep the test duration short, but performs
-    #     # test at the end of the flash to verify that high addresses may be
-    #     # reached
-    #     self.flash = SerialFlashManager.get_flash_device(self.ftdi_url, 0,
-    #                                                      self.frequency)
-    #     length = min(len(self.flash), size)
-    #     start = len(self.flash)-length
-    #     print("Erase %s from flash @ 0x%06x (may take a while...)" %
-    #           (pretty_size(length), start))
-    #     delta = now()
-    #     self.flash.unlock()
-    #     self.flash.erase(start, length, True)
-    #     delta = now()-delta
-    #     self._report_bw('Erased', length, delta)
-    #     if str(self.flash).startswith('SST'):
-    #         # SST25 flash devices are tremendously slow at writing (one or two
-    #         # bytes per SPI request MAX...). So keep the test sequence short
-    #         # enough
-    #         length = 16 << 10
-    #     print("Build test sequence")
-    #     if not randomize:
-    #         buf = bytearray()
-    #         for address in range(0, length, 4):
-    #             buf.extend(spack('>I', address))
-    #         # Expect to run on x86 or ARM (little endian), so swap the values
-    #         # to ease debugging
-    #     else:
-    #         seed(0)
-    #         buf = bytearray()
-    #         buf.extend((randint(0, 255) for _ in range(0, length)))
-    #     print("Writing %s to flash (may take a while...)" %
-    #           pretty_size(len(buf)))
-    #     delta = now()
-    #     self.flash.write(start, buf)
-    #     delta = now()-delta
-    #     length = len(buf)
-    #     self._report_bw('Wrote', length, delta)
-    #     wmd = sha1()
-    #     wmd.update(buf)
-    #     refdigest = wmd.hexdigest()
-    #     print("Reading %s from flash" % pretty_size(length))
-    #     delta = now()
-    #     back = self.flash.read(start, length)
-    #     delta = now()-delta
-    #     self._report_bw('Read', length, delta)
-    #     # print "Dump flash"
-    #     # print hexdump(back.tobytes())
-    #     print("Verify flash")
-    #     rmd = sha1()
-    #     rmd.update(back)
-    #     newdigest = rmd.hexdigest()
-    #     print("Reference:", refdigest)
-    #     print("Retrieved:", newdigest)
-    #     if refdigest != newdigest:
-    #         errcount = 0
-    #         for pos in range(len(buf)):
-    #             if buf[pos] != back[pos]:
-    #                 print('Invalid byte @ offset 0x%06x: 0x%02x / 0x%02x' %
-    #                       (pos, buf[pos], back[pos]))
-    #                 errcount += 1
-    #                 # Stop report after 16 errors
-    #                 if errcount >= 32:
-    #                     break
-    #         raise self.fail('Data comparison mismatch')
+    def test_flashdevice_3_small_rw(self):
+        """Short R/W test
+        """
+        self.flash = SerialFlashManager.get_flash_device(self.ftdi_url, 0,
+                                                         self.frequency)
+        self.flash.unlock()
+        self.flash.erase(0x007000, 4096)
+        data = self.flash.read(0x007020, 128)
+        ref = bytes([0xff] * 128)
+        self.assertEqual(data, ref)
+        test = 'This is a serial SPI flash test.' * 3
+        ref2 = bytearray(test.encode('ascii'))
+        self.flash.write(0x007020, ref2)
+        data = self.flash.read(0x007020, 128)
+        ref2.extend(ref)
+        ref2 = ref2[:128]
+        self.assertEqual(data, ref2)
 
-    # def test_usb_device(self):
-    #     """Demo instanciation from an existing UsbDevice.
-    #     """
-    #     candidate = Ftdi.get_identifiers(self.ftdi_url)
-    #     usbdev = UsbTools.get_device(candidate[0])
-    #     spi = SpiController(cs_count=1)
-    #     spi.configure(usbdev, interface=candidate[1])
-    #     flash = SerialFlashManager.get_from_controller(spi, cs=0,
-    #                                                    freq=self.frequency)
+    def test_flashdevice_4_long_rw(self):
+        """Long R/W test
+        """
+        # Max size to perform the test on
+        size = 1 << 20
+        # Whether to test with random value, or contiguous values to ease debug
+        randomize = True
+        # Fill in the whole flash with a monotonic increasing value, that is
+        # the current flash 32-bit address, then verify the sequence has been
+        # properly read back
+        # limit the test to 1MiB to keep the test duration short, but performs
+        # test at the end of the flash to verify that high addresses may be
+        # reached
+        self.flash = SerialFlashManager.get_flash_device(self.ftdi_url, 0,
+                                                         self.frequency)
+        length = min(len(self.flash), size)
+        start = len(self.flash)-length
+        print("Erase %s from flash @ 0x%06x (may take a while...)" %
+              (pretty_size(length), start))
+        delta = now()
+        self.flash.unlock()
+        self.flash.erase(start, length, True)
+        delta = now()-delta
+        self._report_bw('Erased', length, delta)
+        if str(self.flash).startswith('SST'):
+            # SST25 flash devices are tremendously slow at writing (one or two
+            # bytes per SPI request MAX...). So keep the test sequence short
+            # enough
+            length = 16 << 10
+        print("Build test sequence")
+        if not randomize:
+            buf = bytearray()
+            for address in range(0, length, 4):
+                buf.extend(spack('>I', address))
+            # Expect to run on x86 or ARM (little endian), so swap the values
+            # to ease debugging
+        else:
+            seed(0)
+            buf = bytearray()
+            buf.extend((randint(0, 255) for _ in range(0, length)))
+        print("Writing %s to flash (may take a while...)" %
+              pretty_size(len(buf)))
+        delta = now()
+        self.flash.write(start, buf)
+        delta = now()-delta
+        length = len(buf)
+        self._report_bw('Wrote', length, delta)
+        wmd = sha1()
+        wmd.update(buf)
+        refdigest = wmd.hexdigest()
+        print("Reading %s from flash" % pretty_size(length))
+        delta = now()
+        back = self.flash.read(start, length)
+        delta = now()-delta
+        self._report_bw('Read', length, delta)
+        # print "Dump flash"
+        # print hexdump(back.tobytes())
+        print("Verify flash")
+        rmd = sha1()
+        rmd.update(back)
+        newdigest = rmd.hexdigest()
+        print("Reference:", refdigest)
+        print("Retrieved:", newdigest)
+        if refdigest != newdigest:
+            errcount = 0
+            for pos in range(len(buf)):
+                if buf[pos] != back[pos]:
+                    print('Invalid byte @ offset 0x%06x: 0x%02x / 0x%02x' %
+                          (pos, buf[pos], back[pos]))
+                    errcount += 1
+                    # Stop report after 16 errors
+                    if errcount >= 32:
+                        break
+            raise self.fail('Data comparison mismatch')
 
-    # def test_spi_controller(self):
-    #     """Demo instanciation with an SpiController.
-    #     """
-    #     spi = SpiController(cs_count=1)
-    #     spi.configure(self.ftdi_url)
-    #     flash = SerialFlashManager.get_from_controller(spi, cs=0,
-    #                                                    freq=self.frequency)
+    def test_usb_device(self):
+        """Demo instanciation from an existing UsbDevice.
+        """
+        candidate = Ftdi.get_identifiers(self.ftdi_url)
+        usbdev = UsbTools.get_device(candidate[0])
+        spi = SpiController(cs_count=1)
+        spi.configure(usbdev, interface=candidate[1])
+        flash = SerialFlashManager.get_from_controller(spi, cs=0,
+                                                       freq=self.frequency)
+
+    def test_spi_controller(self):
+        """Demo instanciation with an SpiController.
+        """
+        spi = SpiController(cs_count=1)
+        spi.configure(self.ftdi_url)
+        flash = SerialFlashManager.get_from_controller(spi, cs=0,
+                                                       freq=self.frequency)
 
     @classmethod
     def _report_bw(cls, action, length, time_):
