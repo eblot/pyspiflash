@@ -1504,7 +1504,7 @@ class PN26QFlashDevice(_Gen25FlashDevice):
     
     """In case of reading NAND flash, address would be in terms of block address and page address 6 bits (0:5 -> PageAdd) and 10 bits (6:15 -> BlockAdd)"""
     def read(self, address: int , length: int) -> bytes:  
-        blockAddress = address & 65472
+        blockAddress = address >> 6
         pageAddress =  address & 63
         if (blockAddress*self.BYTES_PER_BLOCK)+(pageAddress*self.PAGE_SIZE)+length > len(self):
             raise SerialFlashValueError('Out of range')
