@@ -654,12 +654,12 @@ class _Gen25FlashDevice(_SpiFlashDevice):
             sequences = [(address, data[:count]), (up, data[count:])]
         else:
             sequences = [(address, data)]
-        for addr, _ in sequences:
+        for addr, chunk in sequences:
             self._enable_write()
             wcmd = bytearray((self.CMD_PROGRAM_PAGE,
                               (addr >> 16) & 0xff, (addr >> 8) & 0xff,
                               addr & 0xff))
-            wcmd.extend(data)
+            wcmd.extend(chunk)
             self._spi.exchange(wcmd)
             self._wait_for_completion(self.get_timings('page'))
 
