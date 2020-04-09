@@ -37,7 +37,7 @@ from setuptools.command.build_py import build_py
 NAME = 'pyspiflash'
 PACKAGES = find_packages(where='.')
 META_PATH = joinpath('spiflash', '__init__.py')
-KEYWORDS = ['driver', 'ftdi', 'usb', 'serial', 'spi', 'flash', 'mtd']
+KEYWORDS = ['driver', 'ftdi', 'usb', 'spi', 'flash', 'mtd']
 CLASSIFIERS = [
     'Development Status :: 4 - Beta',
     'Environment :: Other Environment',
@@ -130,8 +130,9 @@ class BuildPy(build_py):
                     raise RuntimeError("Invalid line width '%s'" % file)
 
 
-if __name__ == '__main__':
+def main():
     setup(
+        cmdclass={'build_py': BuildPy},
         name=NAME,
         description=find_meta('description'),
         license=find_meta('license'),
@@ -150,3 +151,11 @@ if __name__ == '__main__':
         install_requires=INSTALL_REQUIRES,
         python_requires='>=3.5',
     )
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except Exception as exc:
+        print(exc, file=stderr)
+        exit(1)
