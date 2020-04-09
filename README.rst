@@ -1,6 +1,9 @@
 pyspiflash
 ==========
 
+.. image:: https://github.com/eblot/pyspiflash/workflows/Python%20package/badge.svg
+   :alt: Python package build status
+
 SPI data flash device drivers (pure Python)
 
 SPI flash devices, also known as *DataFlash* are commonly found in embedded
