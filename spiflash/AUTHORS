@@ -15,3 +15,5 @@ Contributors:
  * Tyler Bell:
   * Add type hints
   * Add erase chip implementation for some flash devices
+ * Patrick Urban
+  * Fix an issue with partial page writes

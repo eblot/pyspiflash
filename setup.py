@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2010-2019 Emmanuel Blot <emmanuel.blot@free.fr>
+# Copyright (c) 2010-2020 Emmanuel Blot <emmanuel.blot@free.fr>
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -46,7 +46,7 @@ CLASSIFIERS = [
     'Topic :: System :: Hardware :: Hardware Drivers',
 ]
 INSTALL_REQUIRES = [
-    'pyftdi >= 0.42, < 0.50'
+    'pyftdi >= 0.42, < 0.51'
 ]
 
 HERE = os.path.abspath(os.path.dirname(__file__))
