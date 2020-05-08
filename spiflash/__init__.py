@@ -19,12 +19,13 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-__version__ = '0.6.2'
+__version__ = '0.6.3'
 __title__ = 'pyspiflash'
 __description__ = 'SPI data flash device drivers (pure Python)'
 __uri__ = 'http://github.com/eblot/pyspiflash'
 __doc__ = __description__ + ' <' + __uri__ + '>'
 __author__ = 'Emmanuel Blot'
+# For all support requests, please open a new issue on GitHub
 __email__ = 'emmanuel.blot@free.fr'
 __license__ = 'MIT'
-__copyright__ = 'Copyright (c) 2011-2019 Emmanuel Blot'
+__copyright__ = 'Copyright (c) 2011-2020 Emmanuel Blot'

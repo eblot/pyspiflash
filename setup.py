@@ -55,7 +55,7 @@ CLASSIFIERS = [
     'Topic :: System :: Hardware :: Hardware Drivers',
 ]
 INSTALL_REQUIRES = [
-    'pyftdi >= 0.42, < 0.51'
+    'pyftdi >= 0.42, < 0.60'
 ]
 
 HERE = abspath(dirname(__file__))
