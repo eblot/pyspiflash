@@ -1069,6 +1069,88 @@ class At25FlashDevice(_Gen25FlashDevice):
             self._wait_for_completion(self.get_timings('page'))
 
 
+class AT25XE041BFlashDevice(_Gen25FlashDevice):
+    """Atmel AT25 flash device implementation"""
+
+    JEDEC_ID = 0x1F
+    SIZES = {0x44: 4 << 17}
+    SPI_FREQ_MAX = 85  # MHz
+    TIMINGS = {'page': (0.006, 0.015),  # 6/15 ms
+               'subsector': (0.045, 0.060),  # 45/60 ms
+               'hsector': (0.360, 0.450),  # 360/450 ms
+               'sector': (0.720, 0.850),  # 720/850 ms
+               'bulk': (32, 64),  # seconds
+               'lock': (0.0015, 0.003),
+               'chip': (5.5, 6.8)}  # 5.5/6.8 s
+    FEATURES = (SerialFlash.FEAT_SECTERASE |
+                SerialFlash.FEAT_SUBSECTERASE |
+                SerialFlash.FEAT_CHIPERASE |
+                SerialFlash.FEAT_HSECTERASE)
+
+    CMD_PROTECT_SOFT_WRITE = 0x36
+    CMD_PROTECT_LOCK_WRITE = 0x33
+    CMD_UNPROTECT_SOFT_WRITE = 0x39
+    CMD_PROTECT_LOCK_READ = 0x35
+    CMD_PROTECT_SOFT_READ = 0x3C
+    CMD_ENABLE_LOCK_PROTECT = 0x08
+    CMD_ENABLE_SOFT_PROTECT = 0x80
+    ASSERT_LOCK_PROTECT = 0xD0
+
+    PAGE_DIV = 8
+    SUBSECTOR_DIV = 12
+    HSECTOR_DIV = 15
+    SECTOR_DIV = 16
+
+    def __init__(self, spi, jedec):
+        super(AT25XE041BFlashDevice, self).__init__(spi)
+        if not AT25XE041BFlashDevice.match(jedec):
+            raise SerialFlashUnknownJedec(jedec)
+        capacity = jedec[1]
+        self._device = 'AT25XE041B'
+        self._size = AT25XE041BFlashDevice.SIZES[capacity]
+        print(self._size)
+
+    def __str__(self):
+        return 'Adesto %s %s' % \
+            (self._device, pretty_size(self._size, lim_m=1 << 20))
+
+    @classmethod
+    def match(cls, jedec):
+        """Tells whether this class support this JEDEC identifier"""
+        manufacturer, capacity, revision = jedec[:3]
+        if manufacturer != cls.JEDEC_ID:
+            return False
+        if revision < 1 :
+            return False
+        if capacity not in cls.SIZES:
+            return False
+        return True
+
+    def unlock(self):
+        self._lock(self.CMD_UNPROTECT_SOFT_WRITE, 0, self._size)
+
+    def _erase_chip(self, command, times):
+        self._enable_write()
+        cmd = bytes((command,))
+        self._spi.exchange(cmd)
+        self._wait_for_completion(times)
+        time.sleep(times[1])
+
+    def _lock(self, command, address, length):
+        # caller should have check address & length alignment
+        sector_size = self.get_size('sector')
+        sector_mask = ~(self.get_size('sector')-1)
+        start = address & sector_mask
+        end = (address+length) & sector_mask
+        for addr in range(start, end, sector_size):
+            self._enable_write()
+            wcmd = bytearray((command,
+                              (addr >> 16) & 0xff, (addr >> 8) & 0xff, addr & 0xff))
+            if self.CMD_PROTECT_LOCK_WRITE == command:
+                wcmd.append(self.ASSERT_LOCK_PROTECT)
+            self._spi.exchange(wcmd)
+            self._wait_for_completion(self.get_timings('page'))
+
 class At45FlashDevice(_SpiFlashDevice):
     """Flash device implementation for AT45 (Atmel/Adesto)
 
