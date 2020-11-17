@@ -1145,7 +1145,9 @@ class AT25XE041BFlashDevice(_Gen25FlashDevice):
         for addr in range(start, end, sector_size):
             self._enable_write()
             wcmd = bytearray((command,
-                              (addr >> 16) & 0xff, (addr >> 8) & 0xff, addr & 0xff))
+                              (addr >> 16) & 0xff,
+                              (addr >> 8) & 0xff,
+                              addr & 0xff))
             if self.CMD_PROTECT_LOCK_WRITE == command:
                 wcmd.append(self.ASSERT_LOCK_PROTECT)
             self._spi.exchange(wcmd)
