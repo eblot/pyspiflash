@@ -47,7 +47,7 @@ class SerialFlashTestCase(unittest.TestCase):
     def setUpClass(cls):
         # FTDI device should be defined to your actual setup
         cls.ftdi_url = environ.get('FTDI_DEVICE', 'ftdi://ftdi:232h:/1')
-        cls.frequency = float(environ.get('SPI_FREQUENCY', 10E6))
+        cls.frequency = float(environ.get('SPI_FREQUENCY', 20E6))
         print('Using FTDI device %s' % cls.ftdi_url)
 
     def setUp(self):
@@ -98,6 +98,7 @@ class SerialFlashTestCase(unittest.TestCase):
         """
         # Max size to perform the test on
         size = 1 << 20
+        size = 1024*256
         # Whether to test with random value, or contiguous values to ease debug
         randomize = True
         # Fill in the whole flash with a monotonic increasing value, that is
@@ -109,7 +110,7 @@ class SerialFlashTestCase(unittest.TestCase):
         self.flash = SerialFlashManager.get_flash_device(self.ftdi_url, 0,
                                                          self.frequency)
         length = min(len(self.flash), size)
-        start = len(self.flash)-length
+        start = len(self.flash)-length*2
         print("Erase %s from flash @ 0x%06x (may take a while...)" %
               (pretty_size(length), start))
         delta = now()

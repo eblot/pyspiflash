@@ -1075,13 +1075,15 @@ class AT25XE041BFlashDevice(_Gen25FlashDevice):
     JEDEC_ID = 0x1F
     SIZES = {0x44: 4 << 17}
     SPI_FREQ_MAX = 85  # MHz
-    TIMINGS = {'page': (0.006, 0.015),  # 6/15 ms
-               'subsector': (0.045, 0.060),  # 45/60 ms
+    TIMINGS = {'page': (0.0015, 0.003),  # 1.5/3 ms
+               'subsector': (0.045, 0.060),  # 200/200 ms
                'hsector': (0.360, 0.450),  # 360/450 ms
-               'sector': (0.720, 0.850),  # 720/850 ms
+               'sector': (0.720, 0.850),  # 950/950 ms
                'bulk': (32, 64),  # seconds
                'lock': (0.0015, 0.003),
-               'chip': (5.5, 6.8)}  # 5.5/6.8 s
+               'chip': (4, 11)}  # 1.5/3 ms
+
+
     FEATURES = (SerialFlash.FEAT_SECTERASE |
                 SerialFlash.FEAT_SUBSECTERASE |
                 SerialFlash.FEAT_CHIPERASE |
