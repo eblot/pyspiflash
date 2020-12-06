@@ -46,7 +46,7 @@ class SerialFlashTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # FTDI device should be defined to your actual setup
-        cls.ftdi_url = environ.get('FTDI_DEVICE', 'ftdi://ftdi:232h:/1')
+        cls.ftdi_url = environ.get('FTDI_DEVICE', 'ftdi:///1')
         cls.frequency = float(environ.get('SPI_FREQUENCY', 20E6))
         print('Using FTDI device %s' % cls.ftdi_url)
 

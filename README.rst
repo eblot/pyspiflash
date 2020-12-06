@@ -68,7 +68,7 @@ variants:
 .. _SST25: http://ww1.microchip.com/downloads/en/DeviceDoc/25071A.pdf
 .. _MX25L: http://www.mxic.com.tw/
 .. _W25Q: http://www.nexflash.com/hq/enu/ProductAndSales/ProductLines/FlashMemory/SerialFlash/
-.. _AT25XE041B: https://cz.mouser.com/datasheet/2/590/DS-AT25XE041B_062-1385782.pdf
+.. _AT25XE041B: https://www.adestotech.com/wp-content/uploads/DS-AT25XE041B_062.pdf
 Supported SPI flash commands
 ----------------------------
 
