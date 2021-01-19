@@ -5,15 +5,17 @@ Main developers:
 
 Contributors:
 
- * David Brown:
+ * David Brown
   * Fix M25Px flash device size in SPI management
- * DavidWC:
+ * DavidWC
   * Add support for larger Numonix serial data flash devices
- * Roger Hu:
+ * Roger Hu
   * Remove deprecated call to SpiPort from generic 25 SPI flash device
   * Add JEDEC information for low density W25Q & AT45 flash devices
- * Tyler Bell:
+ * Tyler Bell
   * Add type hints
   * Add erase chip implementation for some flash devices
  * Patrick Urban
   * Fix an issue with partial page writes
+ * Bretislav Bakala
+  * AT25XE041B support

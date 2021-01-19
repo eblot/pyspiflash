@@ -1,4 +1,4 @@
-# Copyright (c) 2010-2020, Emmanuel Blot <emmanuel.blot@free.fr>
+# Copyright (c) 2010-2021, Emmanuel Blot <emmanuel.blot@free.fr>
 # All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -28,4 +28,4 @@ __author__ = 'Emmanuel Blot'
 # For all support requests, please open a new issue on GitHub
 __email__ = 'emmanuel.blot@free.fr'
 __license__ = 'MIT'
-__copyright__ = 'Copyright (c) 2011-2020 Emmanuel Blot'
+__copyright__ = 'Copyright (c) 2011-2021 Emmanuel Blot'
