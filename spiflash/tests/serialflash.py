@@ -74,6 +74,10 @@ class SerialFlashTestCase(unittest.TestCase):
         delta = now()-delta
         length = len(data)
         self._report_bw('Read', length, delta)
+        f = open('spiData.bin','wb')             #Dumping data to file
+        f.write(data)
+        print("Data read length: %d", length)
+        f.close()
 
     def test_flashdevice_3_small_rw(self):
         """Short R/W test

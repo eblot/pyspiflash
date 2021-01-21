@@ -32,7 +32,7 @@ from pyftdi.spi import SpiController, SpiPort
 # pylint: disable-msg=too-many-branches
 # pylint: disable-msg=too-many-statements
 # pylint: disable-msg=abstract-method
-# pylint: disable-msg=invalid-name
+# pylint: disable-msg=invalid-name 
 
 
 class SerialFlashError(Exception):
@@ -1433,3 +1433,195 @@ class N25QFlashDevice(_Gen25FlashDevice):
                           (0 << self.SECTOR_LOCK_DOWN) |
                           (0 << self.SECTOR_WRITE_LOCK)))
         self._spi.exchange(wcmd)
+
+
+class PN26QFlashDevice(_Gen25FlashDevice):
+    """Paragon  flash device 1.8v, 1 GBit i.e 128 MByte, PN26Q01AWSIUG implementation"""
+
+    JEDEC_ID = 0xA1
+    DEVICES = {0xC1: 'PN26Q'}
+    SIZES = {0xFF: 8 << 24}
+    SPI_FREQ_MAX = 108 #MHz  
+    CMD_GET_FEATURES = 0x0F
+    CMD_SET_FEATURES = 0x1F
+    CMD_PAGE_READ = 0x13
+    CMD_RESET = 0xFF
+    CMD_READ_FROM_CACHE = 0x03
+    CMD_WRITE_ENABLE = 0x06
+    CMD_WRITE_DISABLE = 0x04
+    CMD_PROGRAM_LOAD = 0x02
+    CMD_PROGRAM_LOAD_RANDOM_DATA = 0x84
+    CMD_PROGRAM_EXECUTE = 0x10
+    CMD_BLOCK_ERASE = 0xD8
+
+
+    FEATURE_LOCK = 0xA0
+    FEATURE_FEATURE = 0xB0
+    FEATURE_STATUS = 0xC0
+
+    STATUS_OIP = 1 << 0
+    STATUS_ECCS0 = 1 << 4
+    STATUS_ECCS1 = 1 << 5
+    STATUS_P_FAIL = 1 << 3
+    STATUS_E_FAIL = 1 << 2
+
+    FEATURE_ECC = 1 << 4
+
+    PAGE_SIZE = 2048
+    BLOCK_COUNT = 1024
+    PAGE_PER_BLOCK = 64
+    BYTES_PER_BLOCK = PAGE_PER_BLOCK * PAGE_SIZE
+    FLASH_SIZE = BLOCK_COUNT*PAGE_PER_BLOCK*PAGE_SIZE
+
+    def __init__(self, spi, jedec):
+        super(PN26QFlashDevice, self).__init__(spi)
+        if not PN26QFlashDevice.match(jedec):
+            raise SerialFlashUnknownJedec(jedec)
+        device = jedec[2]
+        capacity = jedec[0]
+        self._device = self.DEVICES[device]
+        self._size = self.SIZES[capacity]
+
+    def __str__(self):
+        return 'Paragon %s%03d %s' % \
+            (self._device, len(self) >> 17, 
+             pretty_size(self._size, lim_m=1 << 20))
+
+    @classmethod
+    def match(cls, jedec: Union[bytes, bytearray, Iterable[int]]) -> bool:
+        """Tells whether this class support this JEDEC identifier"""
+        manufacturer, device = jedec[1:3]
+        if manufacturer != cls.JEDEC_ID:
+            return False
+        if device not in cls.DEVICES:
+            return False
+        return True
+
+    def _reset_device(self) -> None:
+        self._spi.write([self.CMD_RESET])
+
+    def _check_busy(self) -> bool:
+        status = self._spi.exchange([self.CMD_GET_FEATURES, self.FEATURE_STATUS],1)
+        return bool(status[0] & self.STATUS_OIP)
+
+    def _enable_ecc(self) -> None:
+        feature = self._spi.exchange([self.CMD_GET_FEATURES, self.FEATURE_FEATURE],1)
+        feature[0] |= self.FEATURE_ECC
+        self._spi.write([self.CMD_SET_FEATURES,self.FEATURE_FEATURE, feature[0]])
+
+    def _check_ecc(self) -> bool:
+        status = self._spi.exchange([self.CMD_GET_FEATURES, self.FEATURE_STATUS],1)
+        ecc = status[0] & (self.STATUS_ECCS0 | self.STATUS_ECCS1)
+        return not (status[0] == self.STATUS_ECCS1)
+        #return (ecc == self.STATUS_ECCS1)
+
+
+    def _read_page(self, blockAddress: int, pageAddress: int) -> bytes :
+        return self._spi.exchange([self.CMD_PAGE_READ, 0x00,blockAddress>>2,pageAddress|(blockAddress<<6 & 192)])
+    
+
+    def _read_cache(self, dataSize) -> bytes:
+         return self._spi.exchange([self.CMD_READ_FROM_CACHE, 0x40, 0x00, 0x00], dataSize)
+
+    def _write_enable(self) :
+        self._spi.write([self.CMD_WRITE_ENABLE])
+
+    def _get_feature(self, address: int) -> bytes :
+        return self._spi.exchange([self.CMD_GET_FEATURES, address],1)
+
+    def _set_feature(self, address: int, value: int) :
+        self._spi.exchange([self.CMD_SET_FEATURES, address, value])
+
+
+    def _check_erase_fail(self) :
+        status = self._spi.exchange([self.CMD_GET_FEATURES, self.FEATURE_STATUS],1)
+        return bool(status[0] & self.STATUS_E_FAIL)
+
+    def _check_programme_fail(self) :
+        status = self._spi.exchange([self.CMD_GET_FEATURES, self.FEATURE_STATUS],1)
+        return bool(status[0] & self.STATUS_P_FAIL)
+
+    def unlock(self) :
+        self._set_feature(self.FEATURE_LOCK,0x00)
+    
+    def is_busy(self):
+        return self._check_busy()
+    
+    def _erase_block(self, blockAddress: int) :
+         self._enable_ecc()
+         self._write_enable()
+         self._spi.write([self.CMD_ERASE_CHIP,0x00,blockAddress>>2,(blockAddress<<6 & 192)])
+         while self._check_busy():
+                time.sleep(0.01) 
+         if self._check_erase_fail():
+                raise IOError('Erase Fail')
+    
+    def _program_load(self,dataBytes: bytearray):
+         byteAddress = 0x00
+         wcmd = bytearray((self.CMD_PROGRAM_LOAD,0x00|byteAddress>>8,byteAddress & 0xff))
+         wcmd.extend(dataBytes)
+         self._spi.write(wcmd)
+
+    def _program_execute(self, blockAddress: int, pageAddress: int) :
+        self._spi.write([self.CMD_PROGRAM_EXECUTE,0x00,blockAddress>>2,pageAddress|(blockAddress<<6 & 192)])
+
+
+    def _read_all(self):
+        buf = bytearray()
+        self._reset_device()
+        self._enable_ecc()
+        dataLen = 0   
+        print("Reading Complete Flash")
+        for j in range(0,self.BLOCK_COUNT):
+            for i in range(0,self.PAGE_PER_BLOCK):
+            
+                dataList = []
+                self._read_page(j,i)
+                while self._check_busy():
+                    pass  
+                if not self._check_ecc():
+                    raise IOError('Corrupted, non recoverable flash content')
+                
+                dataList = self._read_cache(self.PAGE_SIZE)
+                buf.extend(dataList) 
+           
+        return bytes(buf)
+
+    
+    """In case of reading NAND flash, address would be in terms of block address and page address 6 bits (0:5 -> PageAdd) and 10 bits (6:15 -> BlockAdd)"""
+    def read(self, address: int , length: int) -> bytes:  
+        blockAddress = address >> 6
+        pageAddress =  address & 63
+        if (blockAddress*self.BYTES_PER_BLOCK)+(pageAddress*self.PAGE_SIZE)+length > len(self):
+            raise SerialFlashValueError('Out of range')
+        
+        elif address == 0 and length == len(self):          #Dump Complete Flash      
+            return self._read_all()
+        
+        else :
+            buf = bytearray()
+            while length > 0:
+                size = min(length, self.PAGE_SIZE)
+                self._read_page( blockAddress,pageAddress)
+                while self._check_busy():
+                    pass  
+                if not self._check_ecc():
+                    raise IOError('Corrupted, non recoverable flash content')
+                data = self._read_cache(size)
+                length -= len(data)
+                address += len(data)
+                buf.extend(data)
+                pageAddress += 1
+                if pageAddress >= self.PAGE_PER_BLOCK :
+                    blockAddress += 1
+                    pageAddress = 0
+            return bytes(buf)
+    
+             
+    def erase(self, blockAddress: int) :
+        self._erase_block(blockAddress) 
+
+    def write(self, address: int,
+              data: Union[bytes, bytearray, Iterable[int]]) -> None:
+
+              print("Not Supported Yet. To Do")
