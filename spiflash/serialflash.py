@@ -1433,3 +1433,32 @@ class N25QFlashDevice(_Gen25FlashDevice):
                           (0 << self.SECTOR_LOCK_DOWN) |
                           (0 << self.SECTOR_WRITE_LOCK)))
         self._spi.exchange(wcmd)
+
+class Gd25qFlashDevice(_Gen25FlashDevice):
+    """GigaDevice GD25QxxB flash device implementation"""
+
+    JEDEC_ID = 0x68
+    DEVICES = {0x40: 'BY25Q'}
+    SIZES = {0x15: 2 << 20}
+    SPI_FREQ_MAX = 120  # MHz
+    TIMINGS = {'page': (0.0007, 0.003),  # .7/3 ms
+               'subsector': (0.100, 0.500),  # 100/500 ms
+               'sector': (0.4, 2.0),  # .4/2 s
+               'bulk': (10, 30)}  # seconds
+    FEATURES = (SerialFlash.FEAT_SECTERASE |
+                SerialFlash.FEAT_HSECTERASE |
+                SerialFlash.FEAT_SUBSECTERASE |
+                SerialFlash.FEAT_CHIPERASE)
+
+    def __init__(self, spi, jedec):
+        super(Gd25qFlashDevice, self).__init__(spi)
+        if not Gd25qFlashDevice.match(jedec):
+            raise SerialFlashUnknownJedec(jedec)
+        device, capacity = jedec[1:]
+        self._size = Gd25qFlashDevice.SIZES[capacity]
+        self._device = self.DEVICES[device]
+
+    def __str__(self):
+        return 'GigaDevice %s%d %s' % \
+            (self._device, len(self) >> 17,
+             pretty_size(self._size, lim_m=1 << 20))
