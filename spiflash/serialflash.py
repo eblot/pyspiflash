@@ -837,6 +837,114 @@ class S25FlFlashDevice(_Gen25FlashDevice):
             size = rs_size
 
 
+class S25FSFlashDevice(_Gen25FlashDevice):
+    """Spansion S25FL flash device implementation"""
+
+    JEDEC_ID = 0x01
+    DEVICES = {0x02: 'S25FS'}
+    SIZES = {0x20: 64 << 20}
+    CR_FREEZE = 0x01
+    CR_QUAD = 0x02
+    CR_TBPARM = 0x04
+    CR_BPNV = 0x08
+    CR_LOCK = 0x10
+    CR_TBPROT = 0x20
+    CMD_READ_CONFIG = 0x35
+    SPI_FREQ_MAX = 104  # MHz (P series only)
+    TIMINGS = {'page': (0.0015, 0.003),  # 1.5/3 ms
+               'subsector': (0.2, 0.8),  # 200/800 ms
+               'sector': (0.5, 2.0),  # 0.5/2 s
+               'bulk': (32, 64),  # seconds
+               'lock': (0.0015, 0.1),  # 1.5/100 ms
+               'chip': (220, 720), # 220/720 s
+    }
+    FEATURES = (SerialFlash.FEAT_SECTERASE |
+                SerialFlash.FEAT_SUBSECTERASE |
+                SerialFlash.FEAT_CHIPERASE)
+
+    # we only support 256K sectors for s25fs512
+    SECTOR_DIV = 18
+    # only works for first or last 4k param blocks
+    SUBSECTOR_DIV = 12
+
+    def __init__(self, spi, jedec):
+        super(S25FSFlashDevice, self).__init__(spi)
+        if not S25FSFlashDevice.match(jedec):
+            raise SerialFlashUnknownJedec(jedec)
+        device, capacity = jedec[1:3]
+        self._device = self.DEVICES[device]
+        self._size = S25FSFlashDevice.SIZES[capacity]
+
+    def __str__(self):
+        return 'Spansion %s %s' % \
+            (self._device, pretty_size(self._size, lim_m=1 << 20))
+
+    def can_erase(self, address: int, length: int):
+        if address == 0 and (length == -1 or length == len(self)):
+            return
+        # we only allow sector erase except for param zone
+        erase_size = self.get_size('sector')
+        readcfg_cmd = bytes((S25FSFlashDevice.CMD_READ_CONFIG,))
+        config = self._spi.exchange(readcfg_cmd, 1)[0]
+
+        if config & S25FSFlashDevice.CR_TBPARM:
+            # "parameter zone" is defined in the high sectors
+            border = len(self)-8*self.get_size('subsector')
+            if address >= border:
+                erase_size = self.get_size('subsector')
+        else:
+            # "parameter zone" is defined in the low sectors
+            border = 8*self.get_size('subsector')
+            if address + length <= border:
+                erase_size = self.get_size('subsector')
+
+        if address & (erase_size-1):
+            # start address should be aligned on a subsector boundary
+            raise SerialFlashValueError('Start address not aligned on a '
+                                        'erase sector boundary')
+        if ((length-1) & (erase_size-1)) != (erase_size-1):
+            # length should be a multiple of a subsector
+            raise SerialFlashValueError('End address not aligned on a '
+                                        'erase sector boundary')
+        if (address + length) > len(self):
+            raise SerialFlashValueError('Would erase over the flash capacity')
+
+    def erase(self, address: int, length: int, verify: bool = False) -> None:
+        # we first need to check the current configuration register, as a
+        # previous configuration may prevent from altering some of the bits
+        readcfg_cmd = bytes((S25FSFlashDevice.CMD_READ_CONFIG,))
+        config = self._spi.exchange(readcfg_cmd, 1)[0]
+        if config & S25FSFlashDevice.CR_TBPARM:
+            # "parameter zone" is defined in the high sectors
+            # the last sector
+            parameter_address_match = len(self)-length
+            parameter_address = len(self)-8*self.get_size('subsector')
+        else:
+            # "parameter zone" is defined in the low sectors
+            parameter_address_match = 0
+            parameter_address = 0
+
+        if length >= self.get_size('sector') and \
+            address == parameter_address_match:
+            # we want to erase the sector containing the param sector, 
+            # so we need to erase the param zone additionally using 
+            # subsector erase otherwise these will not be erased
+            s_start = parameter_address
+            s_end = 8 * self.get_size('subsector')
+            self._erase_blocks(self.get_erase_command('subsector'),
+                                self.get_timings('subsector'),
+                                s_start, s_end, self.get_size('subsector'))
+        
+        super(S25FSFlashDevice, self).erase(address, length, verify)
+
+    def _erase_chip(self, command: int, times: Tuple[float, float]):
+        """Erase an entire chip"""
+        self._enable_write()
+        cmd = bytes((command,))
+        self._spi.exchange(cmd)
+        self._wait_for_completion(times)
+
+
 class M25PxFlashDevice(_Gen25FlashDevice):
     """Numonix M25P/M25PX flash device implementation"""
 
