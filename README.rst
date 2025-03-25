@@ -36,6 +36,16 @@ Write (KiB/s)      56         64       71      2      63 107        32
 Erase (KiB/s)      60         63       31    500      60 84         28
 ============= ======= ========== ======== ====== ======= ========== ==========
 
+Other supported SPI flash devices
+---------------------------------
+
+Support for the following devices have also been added, but have not been tested
+by the maintainer:
+
+* Boya BY25QxxB
+* GigaDevice GD25QxxB
+* Spansion S25FL, S25FS
+
 Notes about performances
 ........................
 
@@ -52,6 +62,7 @@ Notes about performances
 
 Supporting new flash devices of series '25'
 ...........................................
+
 Many flash devices support a common subset to for read/write/erase operations.
 Critical differences appear with lock and protection features, and with
 security features. An NDA is often required to obtain details about the
@@ -69,6 +80,7 @@ variants:
 .. _MX25L: http://www.mxic.com.tw/
 .. _W25Q: http://www.nexflash.com/hq/enu/ProductAndSales/ProductLines/FlashMemory/SerialFlash/
 .. _AT25XE041B: https://www.adestotech.com/wp-content/uploads/DS-AT25XE041B_062.pdf
+
 Supported SPI flash commands
 ----------------------------
 

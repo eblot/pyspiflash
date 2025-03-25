@@ -19,7 +19,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-__version__ = '0.6.4'
+__version__ = '0.6.5'
 __title__ = 'pyspiflash'
 __description__ = 'SPI data flash device drivers (pure Python)'
 __uri__ = 'http://github.com/eblot/pyspiflash'
