@@ -150,7 +150,7 @@ class SerialFlash:
 
            :return: the capacity of the device, in bytes.
         """
-        raise len(self)
+        return len(self)
 
     def unlock(self) -> None:
         """Make the whole device read/write.
