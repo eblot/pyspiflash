@@ -94,7 +94,7 @@ Unlock
 Dependencies
 ------------
 
-* Python_ 3.5 or above is required.
+* Python_ 3.9 or above is required.
 * PyFTDI_ 0.42 or above is required.
 
 Note about previous releases
