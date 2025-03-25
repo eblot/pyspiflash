@@ -19,3 +19,5 @@ Contributors:
   * Fix an issue with partial page writes
  * Bretislav Bakala
   * AT25XE041B support
+ * Kenny (aSmig)
+  * Add support for GigaDevice GD25QxxB and Boya BY25QxxB devices
