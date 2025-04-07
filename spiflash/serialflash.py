@@ -761,7 +761,7 @@ class S25FlFlashDevice(_Gen25FlashDevice):
 
     JEDEC_ID = 0x01
     DEVICES = {0x02: 'S25FL'}
-    SIZES = {0x15: 4 << 20, 0x16: 8 << 20}
+    SIZES = {0x15: 2 << 20, 0x16: 4 << 20, 0x17: 8 << 20, 0x18: 16 << 20, 0x19: 32 << 20}
     CR_FREEZE = 0x01
     CR_QUAD = 0x02
     CR_TBPARM = 0x04
